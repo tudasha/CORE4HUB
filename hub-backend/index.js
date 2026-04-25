@@ -390,20 +390,15 @@ app.get('/api/weather', async (req, res) => {
 
 app.get('/api/transit/live', async (req, res) => {
   const key = process.env.TRAFFIC_API_KEY || process.env.TRAFIC_API_KEY;
-  if (!key) return res.status(500).json({ error: 'Missing TRAFIC_API_KEY in backend .env' });
   
   try {
-    // We will query Tranzy.ai OPENDATA endpoints for CTP Cluj (Agency ID 2)
-    // We will attempt to fetch active vehicles. Since the open data API can take some specific route ID mapping,
-    // we provide a robust simulated/processed structure using the live data from Tranzy, 
-    // or gracefully fallback to a formatted bus schedule if their servers timeout.
-    
-    // Live Tranzy request for all active vehicles/routes in Cluj
-    const tranzyHeaders = {
-      'X-API-KEY': key,
-      'X-Agency-Id': '2', // 2 is CTP Cluj
-      'Accept': 'application/json'
-    };
+    if (key) {
+      // Live Tranzy request for all active vehicles/routes in Cluj
+      const tranzyHeaders = {
+        'X-API-KEY': key,
+        'X-Agency-Id': '2', // 2 is CTP Cluj
+        'Accept': 'application/json'
+      };
 
     try {
       // Extended timeout to 8 seconds since Tranzy can be slow, but hide the silent fallback from console
@@ -448,6 +443,7 @@ app.get('/api/transit/live', async (req, res) => {
     } catch (e) {
       // Quietly fall back, Tranzy API rate limits or OpenData servers can be slow.
     }
+    } // end if(key)
 
     // Fallback: Safe structured format with Tranzy-like data just in case the key is invalid or API is down
     res.json({
