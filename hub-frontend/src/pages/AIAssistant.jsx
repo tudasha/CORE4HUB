@@ -3,6 +3,7 @@ import { Send, Bot, BrainCircuit, Loader, AlertTriangle, RefreshCw, Mic, MicOff,
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
+import { useSchedule } from '../context/ScheduleContext';
 import { useWeather } from '../hooks/useWeather';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';

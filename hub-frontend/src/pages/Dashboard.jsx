@@ -82,26 +82,51 @@ export default function Dashboard({ sensorData, alerts = [], dismissAlert, conne
   const fetchLiveSuggestions = async () => {
     setLoadingSuggestions(true);
     try {
-      const prompt = `Analyze this live smart home data and output EXACTLY a JSON array of 1 to 2 suggestions.
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+      const todaySchedule = schedule
+        .filter(e => (e.date || todayStr) === todayStr)
+        .sort((a, b) => a.time.localeCompare(b.time))
+        .map(e => `• ${e.time} – ${e.label}${e.done ? ' (done)' : ''}`)
+        .join('\n') || 'No events today';
+
+      const forecastStr = weatherRes?.forecast?.length
+        ? weatherRes.forecast.slice(0, 3).map(f =>
+            `• ${f.date}: ${f.temp}°C, ${f.desc}, Rain: ${f.pop}%, Wind: ${f.wind}m/s`
+          ).join('\n')
+        : `Current: ${weatherRes?.temp ?? '?'}°C, ${weatherRes?.condition ?? 'Unknown'}`;
+
+      const prompt = `Analyze this live smart home data and output EXACTLY a JSON array of 1 to 3 suggestions.
 Data:
-- Weather: ${weatherRes?.temp}°C
+- Outdoor Weather: ${weatherRes?.temp ?? '?'}°C, ${weatherRes?.condition ?? 'unknown'}, Humidity: ${weatherRes?.humidity ?? '?'}%
+- Rain chance today: ${weatherRes?.forecast?.[0]?.pop ?? '?'}%
+- Wind: ${weatherRes?.wind ?? '?'} m/s
 - Energy Price: ${sensorData?.energyPrice ?? 130} EUR/MWh
-- Indoor Temp: ${sensorData?.temperature}°C
+- Indoor Temp: ${sensorData?.temperature ?? '?'}°C
 - Devices ON: ${devices.filter(d => d.on).map(d => d.name).join(', ') || 'None'}
 
-Rules:
-If Energy Price > 100 and high-wattage devices (HVAC, Washing Machine, EV Charger) are ON, suggest turning them off.
-Output format:
+Weather Forecast (next 3 days):
+${forecastStr}
+
+Today's Schedule:
+${todaySchedule}
+
+Rules (apply ALL that match):
+1. WEATHER vs SCHEDULE: If a scheduled activity is outdoors (walk, run, gym, cycling, etc.) AND there is rain (pop > 50%) or strong wind (> 10 m/s) at that time, warn the user and suggest rescheduling or moving it indoors.
+2. ENERGY: If Energy Price > 100 and high-wattage devices (HVAC, Washing Machine, EV Charger) are ON, suggest turning them off.
+3. COMFORT: If Indoor Temp > Outdoor Temp by more than 4°C and it's not raining, suggest opening a window instead of AC.
+
+Output format (ONLY valid JSON array, NO markdown):
 [
   {
     "id": "ai_1",
     "type": "action",
-    "message": "Reasoning...",
+    "message": "Reasoning with specific details (e.g. which activity, what weather issue)...",
     "action": "Button Label",
     "requiresApproval": true,
     "deviceAction": {"device": "HVAC", "on": false}
   }
 ]
+If no issues are found, output an empty array: []
 NO markdown, ONLY JSON array.`;
 
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/gemini`, {
