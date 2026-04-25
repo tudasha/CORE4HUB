@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { mockEnergy } from '../utils/mockData';
 import { Zap, Sun, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
-
+import { useDevices } from '../context/DevicesContext';
 function MiniBarChart({ data, color, height = 70 }) {
   const max = Math.max(...data.map(d => d.consumption));
   return (
@@ -30,6 +30,7 @@ function MiniBarChart({ data, color, height = 70 }) {
 
 export default function Energy({ sensorData }) {
   const [energy, setEnergy] = useState(mockEnergy());
+  const { devices } = useDevices();
 
   useEffect(() => {
     const interval = setInterval(() => setEnergy(mockEnergy()), 15000);
@@ -119,7 +120,7 @@ export default function Energy({ sensorData }) {
           <span style={{ fontSize:'0.8rem', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-secondary)' }}>🏠 Device Consumption</span>
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12 }}>
-          {energy.devices.map((d, i) => (
+          {devices.map((d, i) => (
             <div key={i} style={{ padding:'14px 16px', borderRadius:12, background:'rgba(255,255,255,0.03)', border:`1px solid ${d.on ? 'rgba(16,185,129,0.2)' : 'var(--border-glass)'}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <span style={{ fontSize:'1.5rem' }}>{d.icon}</span>

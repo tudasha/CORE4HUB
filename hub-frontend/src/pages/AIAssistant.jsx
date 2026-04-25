@@ -3,11 +3,10 @@ import { Send, Bot, BrainCircuit, Loader, AlertTriangle, RefreshCw, Mic, MicOff,
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-import { useSchedule } from '../context/ScheduleContext';
 import { useWeather } from '../hooks/useWeather';
 import { useChat } from '../context/ChatContext';
 import { useSettings } from '../context/SettingsContext';
-
+import { useDevices } from '../context/DevicesContext';
 const SYSTEM_PROMPT = `You are SmartHub AI, an intelligent home environment and personal assistant embedded in a Smart Hub tablet.
 You have access to real-time sensor data (weather, health, energy) and the user's daily schedule.
 Your job is to analyze data, help optimize routines, detect anomalies, and make the user's day better.
@@ -44,10 +43,17 @@ User: "I want to walk tomorrow and work starts at 16:00, add to calendar"
 → Look at [Tomorrow's date string] from the context. Use THAT exact date string in the tag.
 [UPDATE_SCHEDULE: {"time": "10:00", "label": "Long Walk 🚶 (Sunny Window)", "color": "var(--accent-primary)", "date": "<use Tomorrow's date string from context>"}]
 
-CRITICAL: The "date" field in the tag MUST be the EXACT date string from the context data (Today or Tomorrow or a specific day). NEVER invent or guess a date. NEVER omit the "date" field. If you omit it, the event will be wrongly placed on today.`;
+CRITICAL: The "date" field in the tag MUST be the EXACT date string from the context data (Today or Tomorrow or a specific day). NEVER invent or guess a date. NEVER omit the "date" field. If you omit it, the event will be wrongly placed on today.
 
+[TOGGLE_DEVICE] Rule:
+You can turn ON or OFF any smart home device that is currently in the "Devices ON/OFF" context list.
+Use this format EXACTLY to toggle a device:
+[TOGGLE_DEVICE: {"device": "Device Name", "on": true}]
+Example to turn off the AC:
+[TOGGLE_DEVICE: {"device": "HVAC", "on": false}]
+Always explain WHY you are toggling it (e.g. "I turned off the AC because energy prices are high.").`;
 
-function buildContextMessage(sensorData, weatherRes, schedule) {
+function buildContextMessage(sensorData, weatherRes, schedule, devices) {
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   const tomorrowDate = new Date(now); tomorrowDate.setDate(tomorrowDate.getDate() + 1);
@@ -82,6 +88,7 @@ function buildContextMessage(sensorData, weatherRes, schedule) {
 3. Energy & Grid
 • Current Energy Price: ${sd.energyPrice ?? '130.0'} EUR/MWh
 • Current Electric Flow: ${sd.electricFlow ?? 'N/A'} A
+• Devices State: ${devices.map(d => `${d.name}: ${d.on ? 'ON' : 'OFF'}`).join(' | ')}
 
 4. User Health Stats
 • Heart Rate: ${sd.heartRate ?? 'N/A'} bpm | SpO₂: ${sd.oxygenLevel ?? 'N/A'}%
@@ -113,6 +120,7 @@ export default function AIAssistant({ sensorData }) {
   const { data: weatherRes } = useWeather();
   const { messages, setMessages } = useChat();
   const { language, voiceAutoSend, voiceEngine } = useSettings();
+  const { devices, toggleDevice } = useDevices();
 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -206,7 +214,7 @@ export default function AIAssistant({ sensorData }) {
     const userText = (text || input).trim();
     if (!userText || loading) return;
 
-    const contextMsg = buildContextMessage(sensorData, weatherRes, schedule);
+    const contextMsg = buildContextMessage(sensorData, weatherRes, schedule, devices);
     const userMessage = { role: 'user', content: userText, timestamp: new Date() };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
@@ -275,8 +283,22 @@ export default function AIAssistant({ sensorData }) {
         }
       }
       
+      const deviceRegex = /\[TOGGLE_DEVICE:\s*(\{[\s\S]*?\})\s*\]/g;
+      let devMatch;
+      while ((devMatch = deviceRegex.exec(replyText)) !== null) {
+        try {
+          const actionData = JSON.parse(devMatch[1]);
+          console.log('[AI Device] Parsed tag:', actionData);
+          if (actionData.device && actionData.on !== undefined) {
+            toggleDevice(actionData.device, actionData.on);
+          }
+        } catch (e) {
+          console.error("Failed to parse AI device tag", devMatch[1], e);
+        }
+      }
+      
       // Clean hidden tags from UI (multi-line safe)
-      replyText = replyText.replace(/\[UPDATE_SCHEDULE:[\s\S]*?\]/g, '').trim();
+      replyText = replyText.replace(/\[UPDATE_SCHEDULE:[\s\S]*?\]/g, '').replace(/\[TOGGLE_DEVICE:[\s\S]*?\]/g, '').trim();
 
       setMessages(prev => [...prev, { role: 'assistant', content: replyText, timestamp: new Date() }]);
       playTTS(replyText);

@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
   Thermometer, Droplets, Wind, Zap, Heart, Activity,
-  Footprints, Sun, CloudSun, AlertTriangle, CheckCircle, Info, X, Bell, BrainCircuit
+  Footprints, Sun, CloudSun, AlertTriangle, CheckCircle, Info, X, Bell, BrainCircuit, Loader, RefreshCw
 } from 'lucide-react';
-import { AI_SUGGESTIONS } from '../utils/mockData';
 import { useWeather, useTransit } from '../hooks/useWeather';
 import { useAuth } from '../context/AuthContext';
 import { useSchedule } from '../context/ScheduleContext';
 import { useSettings } from '../context/SettingsContext';
-
+import { useDevices } from '../context/DevicesContext';
 function StatCard({ icon: Icon, label, value, unit, color, pulse }) {
   return (
     <div className="glass-card stat-card p-4 fade-in" style={{ '--accent-primary': color }}>
@@ -68,7 +67,9 @@ export default function Dashboard({ sensorData, alerts = [], dismissAlert, conne
   const { modules, requireAiConfirmation } = useSettings();
   const { data: weatherRes } = useWeather();
   const { transitInfo: trafficRes } = useTransit();
-  const [suggestions, setSuggestions] = useState(AI_SUGGESTIONS);
+  const { devices, toggleDevice } = useDevices();
+  const [suggestions, setSuggestions] = useState([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [approvedIds, setApprovedIds] = useState([]);
   const [autoAppliedIds, setAutoAppliedIds] = useState([]);
   const [now, setNow] = useState(new Date());
@@ -78,24 +79,72 @@ export default function Dashboard({ sensorData, alerts = [], dismissAlert, conne
     return () => clearInterval(t2);
   }, []);
 
+  const fetchLiveSuggestions = async () => {
+    setLoadingSuggestions(true);
+    try {
+      const prompt = `Analyze this live smart home data and output EXACTLY a JSON array of 1 to 2 suggestions.
+Data:
+- Weather: ${weatherRes?.temp}°C
+- Energy Price: ${sensorData?.energyPrice ?? 130} EUR/MWh
+- Indoor Temp: ${sensorData?.temperature}°C
+- Devices ON: ${devices.filter(d => d.on).map(d => d.name).join(', ') || 'None'}
+
+Rules:
+If Energy Price > 100 and high-wattage devices (HVAC, Washing Machine, EV Charger) are ON, suggest turning them off.
+Output format:
+[
+  {
+    "id": "ai_1",
+    "type": "action",
+    "message": "Reasoning...",
+    "action": "Button Label",
+    "requiresApproval": true,
+    "deviceAction": {"device": "HVAC", "on": false}
+  }
+]
+NO markdown, ONLY JSON array.`;
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/gemini`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+      });
+      const data = await response.json();
+      let replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+      replyText = replyText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(replyText);
+      if (Array.isArray(parsed)) setSuggestions(parsed);
+    } catch (e) {
+      console.error('Failed to fetch AI suggestions:', e);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  useEffect(() => {
+    if (suggestions.length === 0 && !loadingSuggestions && sensorData && devices.length > 0) {
+      fetchLiveSuggestions();
+    }
+  }, [sensorData]); // runs once when sensorData lands
+
   useEffect(() => {
     if (!requireAiConfirmation) {
       suggestions.forEach(s => {
-        if (s.scheduleAction && s.requiresApproval && !autoAppliedIds.includes(s.id) && !approvedIds.includes(s.id)) {
-          addScheduleItem({ ...s.scheduleAction, label: s.scheduleAction.label + ' (Auto-Scheduled)' });
+        if (s.requiresApproval && !autoAppliedIds.includes(s.id) && !approvedIds.includes(s.id)) {
+          if (s.scheduleAction) addScheduleItem({ ...s.scheduleAction, label: s.scheduleAction.label + ' (Auto-Scheduled)' });
+          if (s.deviceAction) toggleDevice(s.deviceAction.device, s.deviceAction.on);
           setAutoAppliedIds(prev => [...prev, s.id]);
         }
       });
     }
-  }, [requireAiConfirmation, suggestions, autoAppliedIds, approvedIds, addScheduleItem]);
+  }, [requireAiConfirmation, suggestions, autoAppliedIds, approvedIds, addScheduleItem, toggleDevice]);
 
   const handleApprove = (id) => {
-    // id may be prefixed with 's_' for suggestions — strip it to find original
     const origId = id.startsWith('s_') ? id.slice(2) : id;
     const suggestion = suggestions.find(s => String(s.id) === String(origId));
-    if (suggestion?.scheduleAction) {
-      addScheduleItem(suggestion.scheduleAction);
-    }
+    if (suggestion?.scheduleAction) addScheduleItem(suggestion.scheduleAction);
+    if (suggestion?.deviceAction) toggleDevice(suggestion.deviceAction.device, suggestion.deviceAction.on);
+    
     setApprovedIds(prev => [...prev, origId]);
     setSuggestions(prev => prev.filter(s => String(s.id) !== String(origId)));
   };
@@ -162,16 +211,25 @@ export default function Dashboard({ sensorData, alerts = [], dismissAlert, conne
 
         {/* Alerts & AI Suggestions */}
         <div>
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-            <BrainCircuit size={16} color="var(--accent-primary)"/>
-            <span style={{ fontSize:'0.8rem', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-secondary)' }}>
-              AI Alerts & Suggestions
-            </span>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <BrainCircuit size={16} color="var(--accent-primary)"/>
+              <span style={{ fontSize:'0.8rem', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-secondary)' }}>
+                AI Alerts & Suggestions
+              </span>
+            </div>
+            <button onClick={fetchLiveSuggestions} disabled={loadingSuggestions} style={{ background:'none', border:'none', cursor:'pointer', display:'flex' }}>
+              <RefreshCw size={14} className={loadingSuggestions ? 'animate-spin' : ''} color="var(--text-muted)" />
+            </button>
           </div>
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            {allAlerts.length === 0 ? (
+            {loadingSuggestions ? (
               <div className="glass-card p-4" style={{ textAlign:'center', color:'var(--text-muted)', fontSize:'0.875rem' }}>
-                <CheckCircle size={24} style={{ marginBottom:8, opacity:0.4 }}/><br/>All clear. No new suggestions.
+                <Loader className="animate-spin" size={24} style={{ marginBottom:8, opacity:0.4, margin:'0 auto' }}/><br/>Gemini is analyzing live data...
+              </div>
+            ) : allAlerts.length === 0 ? (
+              <div className="glass-card p-4" style={{ textAlign:'center', color:'var(--text-muted)', fontSize:'0.875rem' }}>
+                <CheckCircle size={24} style={{ marginBottom:8, opacity:0.4, margin:'0 auto' }}/><br/>All clear. No new suggestions.
               </div>
             ) : (
               allAlerts.map(a => (

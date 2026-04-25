@@ -7,17 +7,20 @@ import { ThemeProvider } from './context/ThemeContext'
 import { ScheduleProvider } from './context/ScheduleContext'
 import { ChatProvider } from './context/ChatContext'
 import { SettingsProvider } from './context/SettingsContext'
+import { DevicesProvider } from './context/DevicesContext'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ThemeProvider>
       <AuthProvider>
         <SettingsProvider>
-          <ScheduleProvider>
-            <ChatProvider>
-              <App />
-            </ChatProvider>
-          </ScheduleProvider>
+          <DevicesProvider>
+            <ScheduleProvider>
+              <ChatProvider>
+                <App />
+              </ChatProvider>
+            </ScheduleProvider>
+          </DevicesProvider>
         </SettingsProvider>
       </AuthProvider>
     </ThemeProvider>
