@@ -98,6 +98,13 @@ export default function Dashboard({ sensorData, alerts = [], dismissAlert, conne
       const hasModule = (id) => modules.find(m => m.id === id)?.active;
       const activeModuleList = modules.filter(m => m.active).map(m => m.label).join(', ') || 'None';
 
+      // Short-circuit: if no modules, do not even ask AI
+      if (activeModuleList === 'None') {
+        setSuggestions([]);
+        setLoadingSuggestions(false);
+        return;
+      }
+
       const prompt = `Analyze this smart home data and output EXACTLY a JSON array of 1 to 3 suggestions.
 User's Active Modules: ${activeModuleList}
 IMPORTANT: ONLY suggest things relevant to the user's active modules. Ignore all other domains.
