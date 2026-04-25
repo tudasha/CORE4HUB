@@ -54,11 +54,13 @@ Example to turn off the AC:
 [TOGGLE_DEVICE: {"device": "HVAC", "on": false}]
 Always explain WHY you are toggling it (e.g. "I turned off the AC because energy prices are high.").`;
 
-function buildContextMessage(sensorData, weatherRes, schedule, devices) {
+function buildContextMessage(sensorData, weatherRes, schedule, devices, modules) {
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   const tomorrowDate = new Date(now); tomorrowDate.setDate(tomorrowDate.getDate() + 1);
   const tomorrowStr = `${tomorrowDate.getFullYear()}-${String(tomorrowDate.getMonth()+1).padStart(2,'0')}-${String(tomorrowDate.getDate()).padStart(2,'0')}`;
+
+  const hasModule = (id) => modules?.find(m => m.id === id)?.active;
 
   const scheduleStr = schedule?.length
     ? schedule.map(e => `• [${e.date || todayStr}] ${e.time} - ${e.label} ${e.done ? '(Done)' : ''}`).join('\n')
@@ -72,37 +74,40 @@ function buildContextMessage(sensorData, weatherRes, schedule, devices) {
     : '(Forecast not available)';
 
   const sd = sensorData || {};
+  const activeModuleList = modules?.filter(m => m.active).map(m => m.label).join(', ') || 'None';
+
   return `[Current Date & Time: ${now.toLocaleDateString('en-GB', {weekday:'long', year:'numeric', month:'long', day:'numeric'})} ${now.toLocaleTimeString()}]
 [Today's date string: ${todayStr}]
 [Tomorrow's date string: ${tomorrowStr}]
+[User's Active Modules: ${activeModuleList}]
 
-[Live Context Data]
-1. Weather (Outside)
+[Live Context Data — only from active modules]
+${hasModule('weather') ? `1. Weather (Outside)
 • Temp: ${weatherRes?.temp ?? 'N/A'}°C | Condition: ${weatherRes?.condition ?? 'Unknown'} (${weatherRes?.desc ?? ''})
-• Humidity: ${weatherRes?.humidity ?? 'N/A'}% | Wind: ${weatherRes?.wind ?? '0'} m/s
+• Humidity: ${weatherRes?.humidity ?? 'N/A'}% | Wind: ${weatherRes?.wind ?? '0'} m/s` : '1. Weather: NOT in user configuration — do NOT give weather advice.'}
 
 2. Smart Home Sensors (Inside / Arduino)
 • Indoor Temp: ${sd.temperature ?? 'N/A'}°C | Indoor Humidity: ${sd.humidity ?? 'N/A'}%
 • Motion Detected: ${sd.motionDetected ? 'YES' : 'NO'}
 • Indoor Light Level: ${sd.lightLevel ?? 'N/A'} lux
 
-3. Energy & Grid
+${hasModule('energy') ? `3. Energy & Grid
 • Current Energy Price: ${sd.energyPrice ?? '130.0'} EUR/MWh
 • Current Electric Flow: ${sd.electricFlow ?? 'N/A'} A
-• Devices State: ${devices.map(d => `${d.name}: ${d.on ? 'ON' : 'OFF'}`).join(' | ')}
+• Devices State: ${devices.map(d => `${d.name}: ${d.on ? 'ON' : 'OFF'}`).join(' | ')}` : '3. Energy: NOT in user configuration — do NOT give energy or device advice.'}
 
-4. User Health Stats
+${hasModule('health') ? `4. User Health Stats
 • Heart Rate: ${sd.heartRate ?? 'N/A'} bpm | SpO₂: ${sd.oxygenLevel ?? 'N/A'}%
-• Steps Today: ${sd.steps ?? 0}
+• Steps Today: ${sd.steps ?? 0}` : '4. Health: NOT in user configuration — do NOT give health or fitness advice.'}
 
-[5-Day Weather Forecast]
-${forecastStr}
+${hasModule('weather') ? `[5-Day Weather Forecast]
+${forecastStr}` : ''}
 
 [User's Full Schedule (All Days)]
 ${scheduleStr}
 
 CRITICAL RULES FOR ADVICE:
-- ONLY base your advice on the LIVE DATA above.
+- ONLY give advice for the modules listed in [User's Active Modules]. If a module is listed as NOT in user configuration, completely ignore that domain.
 - ENERGY SAVINGS: Compare Indoor Temp to Outside Temp. If it's too hot inside and cooler outside, suggest opening the window. If the Energy Price is high (> 100 EUR/MWh), tell the user it's expensive right now and they should limit appliance use or use natural methods (e.g. open the window instead of AC). If the energy price is low (< 50 EUR/MWh), that's a good time to run washing machines or heat up the house.
 - Always be explicitly clear about WHY you suggest something related to the energy price or inside vs outside temp delta.
 - IMPORTANT: Use the exact date strings above when emitting [UPDATE_SCHEDULE] tags. Factor in the weather forecast when recommending outdoor activities.`;
@@ -120,7 +125,7 @@ export default function AIAssistant({ sensorData }) {
   const { schedule, addScheduleItem } = useSchedule();
   const { data: weatherRes } = useWeather();
   const { messages, setMessages } = useChat();
-  const { language, voiceAutoSend, voiceEngine } = useSettings();
+  const { language, voiceAutoSend, voiceEngine, modules } = useSettings();
   const { devices, toggleDevice } = useDevices();
 
   const [input, setInput] = useState('');
@@ -215,7 +220,7 @@ export default function AIAssistant({ sensorData }) {
     const userText = (text || input).trim();
     if (!userText || loading) return;
 
-    const contextMsg = buildContextMessage(sensorData, weatherRes, schedule, devices);
+    const contextMsg = buildContextMessage(sensorData, weatherRes, schedule, devices, modules);
     const userMessage = { role: 'user', content: userText, timestamp: new Date() };
     setMessages(prev => [...prev, userMessage]);
     setInput('');

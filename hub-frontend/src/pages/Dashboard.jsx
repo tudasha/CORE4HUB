@@ -95,38 +95,42 @@ export default function Dashboard({ sensorData, alerts = [], dismissAlert, conne
           ).join('\n')
         : `Current: ${weatherRes?.temp ?? '?'}°C, ${weatherRes?.condition ?? 'Unknown'}`;
 
-      const prompt = `Analyze this live smart home data and output EXACTLY a JSON array of 1 to 3 suggestions.
-Data:
-- Outdoor Weather: ${weatherRes?.temp ?? '?'}°C, ${weatherRes?.condition ?? 'unknown'}, Humidity: ${weatherRes?.humidity ?? '?'}%
-- Rain chance today: ${weatherRes?.forecast?.[0]?.pop ?? '?'}%
-- Wind: ${weatherRes?.wind ?? '?'} m/s
-- Energy Price: ${sensorData?.energyPrice ?? 130} EUR/MWh
-- Indoor Temp: ${sensorData?.temperature ?? '?'}°C
-- Devices ON: ${devices.filter(d => d.on).map(d => d.name).join(', ') || 'None'}
+      const hasModule = (id) => modules.find(m => m.id === id)?.active;
+      const activeModuleList = modules.filter(m => m.active).map(m => m.label).join(', ') || 'None';
 
-Weather Forecast (next 3 days):
-${forecastStr}
+      const prompt = `Analyze this smart home data and output EXACTLY a JSON array of 1 to 3 suggestions.
+User's Active Modules: ${activeModuleList}
+IMPORTANT: ONLY suggest things relevant to the user's active modules. Ignore all other domains.
+
+Available Data (active modules only):
+${hasModule('weather') ? `- Outdoor Weather: ${weatherRes?.temp ?? '?'}°C, ${weatherRes?.condition ?? 'unknown'}, Humidity: ${weatherRes?.humidity ?? '?'}%
+- Rain chance today: ${weatherRes?.forecast?.[0]?.pop ?? '?'}%
+- Wind: ${weatherRes?.wind ?? '?'} m/s` : ''}
+${hasModule('energy') ? `- Energy Price: ${sensorData?.energyPrice ?? 130} EUR/MWh
+- Devices ON: ${devices.filter(d => d.on).map(d => d.name).join(', ') || 'None'}` : ''}
+- Indoor Temp: ${sensorData?.temperature ?? '?'}°C
+${hasModule('weather') ? `\nWeather Forecast (next 3 days):\n${forecastStr}` : ''}
 
 Today's Schedule:
 ${todaySchedule}
 
-Rules (apply ALL that match):
-1. WEATHER vs SCHEDULE: If a scheduled activity is outdoors (walk, run, gym, cycling, etc.) AND there is rain (pop > 50%) or strong wind (> 10 m/s) at that time, warn the user and suggest rescheduling or moving it indoors.
-2. ENERGY: If Energy Price > 100 and high-wattage devices (HVAC, Washing Machine, EV Charger) are ON, suggest turning them off.
-3. COMFORT: If Indoor Temp > Outdoor Temp by more than 4°C and it's not raining, suggest opening a window instead of AC.
+Rules (ONLY apply rules for active modules):
+${hasModule('weather') ? '1. WEATHER vs SCHEDULE: If a scheduled activity is outdoors (walk, run, gym, cycling) AND rain > 50% or wind > 10 m/s, warn and suggest rescheduling.' : ''}
+${hasModule('energy') ? '2. ENERGY: If Energy Price > 100 and high-wattage devices (HVAC, Washing Machine, EV Charger) are ON, suggest turning them off.' : ''}
+${hasModule('weather') && hasModule('energy') ? '3. COMFORT: If Indoor Temp > Outdoor Temp by more than 4°C and no rain, suggest opening a window instead of AC.' : ''}
 
 Output format (ONLY valid JSON array, NO markdown):
 [
   {
     "id": "ai_1",
     "type": "action",
-    "message": "Reasoning with specific details (e.g. which activity, what weather issue)...",
+    "message": "Reasoning with specific details...",
     "action": "Button Label",
     "requiresApproval": true,
     "deviceAction": {"device": "HVAC", "on": false}
   }
 ]
-If no issues are found, output an empty array: []
+If no issues found, output: []
 NO markdown, ONLY JSON array.`;
 
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/gemini`, {
