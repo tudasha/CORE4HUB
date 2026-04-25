@@ -35,7 +35,7 @@ jobs:
         working-directory: hub-frontend
         run: |
           # 🛑 PUNE AICI LINKUL DE LA RENDER 🛑
-          # Înlocuiește 'LINKUL_TAU_AICI' cu adresa ta, de exemplu: https://smarthub-backend-ab2x.onrender.com
+          # Înlocuiește 'LINKUL_TAU_AICI' cu adresa ta, de exemplu: https://smarthub-backend-09he.onrender.com
           
           echo "VITE_API_URL=https://smarthub-backend-09he.onrender.com" > .env
           echo "VITE_WS_URL=wss://smarthub-backend-09he.onrender.com" >> .env
