@@ -272,7 +272,14 @@ NO markdown, ONLY JSON array.`;
           <div style={{ marginBottom:16 }}>
             <span style={{ fontSize:'0.8rem', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-secondary)' }}>📅 Today's Schedule</span>
           </div>
-          {schedule.sort((a,b) => a.time.localeCompare(b.time)).map((e) => (
+          {schedule
+            .filter(e => {
+              const eDate = e.date || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+              const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+              return eDate === todayStr;
+            })
+            .sort((a,b) => a.time.localeCompare(b.time))
+            .map((e) => (
             <div key={e.id} style={{ display:'flex', gap:12, marginBottom:12, opacity: e.done ? 0.5 : 1 }}>
               <div style={{ width:48, fontSize:'0.72rem', fontWeight:600, color:'var(--text-muted)', paddingTop:2, flexShrink:0 }}>{e.time}</div>
               <div style={{ display:'flex', alignItems:'flex-start', gap:8 }}>
