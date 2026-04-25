@@ -1,0 +1,27 @@
+services:
+  hub-db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: hubpass123
+      POSTGRES_DB: smarthub_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - pgdata_v2:/var/lib/postgresql/data
+
+  hub-backend:
+    build:
+      context: ./hub-backend
+    restart: always
+    environment:
+      - DATABASE_URL=postgres://admin:password@hub-db:5432/smarthub_db
+      - PORT=3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - hub-db
+
+volumes:
+  pgdata_v2:
