@@ -107,7 +107,8 @@ ${forecastStr}` : ''}
 ${scheduleStr}
 
 CRITICAL RULES FOR ADVICE:
-- ONLY give advice for the modules listed in [User's Active Modules]. If a module is listed as NOT in user configuration, completely ignore that domain.
+- ONLY give advice for the sensor modules listed in [User's Active Modules]. If a module is listed as NOT in user configuration, completely ignore that domain (e.g. do not give weather advice if Weather is not active).
+- CORE FEATURES: The Calendar/Schedule and Smart Home Devices (Indoor Temp, Motion, Devices) are CORE features. You can ALWAYS help the user schedule events, answer questions about their schedule, or turn devices ON/OFF, regardless of what modules they have.
 - ENERGY SAVINGS: Compare Indoor Temp to Outside Temp. If it's too hot inside and cooler outside, suggest opening the window. If the Energy Price is high (> 100 EUR/MWh), tell the user it's expensive right now and they should limit appliance use or use natural methods (e.g. open the window instead of AC). If the energy price is low (< 50 EUR/MWh), that's a good time to run washing machines or heat up the house.
 - Always be explicitly clear about WHY you suggest something related to the energy price or inside vs outside temp delta.
 - IMPORTANT: Use the exact date strings above when emitting [UPDATE_SCHEDULE] tags. Factor in the weather forecast when recommending outdoor activities.`;
