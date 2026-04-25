@@ -14,7 +14,8 @@ import Register from './pages/Register';
 import { useWebSocket } from './hooks/useWebSocket';
 import { mockSensors } from './utils/mockData';
 import { useAuth } from './context/AuthContext';
-import { Loader } from 'lucide-react';
+import { useSettings } from './context/SettingsContext';
+import { Loader, Lock } from 'lucide-react';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -31,6 +32,19 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
+  return children;
+}
+
+function ModuleRoute({ moduleId, children }) {
+  const { modules } = useSettings();
+  const active = modules.find(m => m.id === moduleId)?.active;
+  if (!active) return (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'60vh', gap:16, color:'var(--text-muted)' }}>
+      <Lock size={48} style={{ opacity:0.3 }} />
+      <div style={{ fontSize:'1.1rem', fontWeight:600 }}>Module not unlocked</div>
+      <div style={{ fontSize:'0.875rem', opacity:0.6 }}>Purchase this sensor package on the SmartEnv website to activate this page.</div>
+    </div>
+  );
   return children;
 }
 
@@ -53,10 +67,10 @@ function MainLayout() {
         <Routes>
           <Route path="/"          element={<Dashboard sensorData={sensorData} alerts={alerts} dismissAlert={dismissAlert} connected={connected} />} />
           <Route path="/assistant" element={<AIAssistant sensorData={sensorData} />} />
-          <Route path="/health"    element={<Health sensorData={sensorData} />} />
-          <Route path="/weather"   element={<Weather />} />
+          <Route path="/health"    element={<ModuleRoute moduleId="health"><Health sensorData={sensorData} /></ModuleRoute>} />
+          <Route path="/weather"   element={<ModuleRoute moduleId="weather"><Weather /></ModuleRoute>} />
           <Route path="/calendar"  element={<CalendarPage />} />
-          <Route path="/energy"    element={<Energy sensorData={sensorData} />} />
+          <Route path="/energy"    element={<ModuleRoute moduleId="energy"><Energy sensorData={sensorData} /></ModuleRoute>} />
           <Route path="/community" element={<Community />} />
           <Route path="/settings"  element={<Settings />} />
           <Route path="*"          element={<Navigate to="/" replace />} />

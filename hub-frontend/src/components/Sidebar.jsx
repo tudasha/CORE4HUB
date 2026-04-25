@@ -3,19 +3,21 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Bot, Heart, CloudSun, Calendar,
   Zap, Users, Settings, ChevronLeft, ChevronRight,
-  Wifi, WifiOff, LogOut
+  Wifi, WifiOff, LogOut, Lock
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 
+// moduleId: null = always visible | string = requires that module to be active
 const NAV_ITEMS = [
-  { to: '/',          icon: LayoutDashboard, label: 'Dashboard',   id: 'nav-dashboard' },
-  { to: '/assistant', icon: Bot,             label: 'AI Assistant',id: 'nav-assistant' },
-  { to: '/health',    icon: Heart,           label: 'Health',      id: 'nav-health'    },
-  { to: '/weather',   icon: CloudSun,        label: 'Weather',     id: 'nav-weather'   },
-  { to: '/calendar',  icon: Calendar,        label: 'Calendar',    id: 'nav-calendar'  },
-  { to: '/energy',    icon: Zap,             label: 'Energy',      id: 'nav-energy'    },
-  { to: '/community', icon: Users,           label: 'Community',   id: 'nav-community' },
-  { to: '/settings',  icon: Settings,        label: 'Settings',    id: 'nav-settings'  },
+  { to: '/',          icon: LayoutDashboard, label: 'Dashboard',   id: 'nav-dashboard', moduleId: null      },
+  { to: '/assistant', icon: Bot,             label: 'AI Assistant',id: 'nav-assistant', moduleId: null      },
+  { to: '/health',    icon: Heart,           label: 'Health',      id: 'nav-health',    moduleId: 'health'  },
+  { to: '/weather',   icon: CloudSun,        label: 'Weather',     id: 'nav-weather',   moduleId: 'weather' },
+  { to: '/calendar',  icon: Calendar,        label: 'Calendar',    id: 'nav-calendar',  moduleId: null      },
+  { to: '/energy',    icon: Zap,             label: 'Energy',      id: 'nav-energy',    moduleId: 'energy'  },
+  { to: '/community', icon: Users,           label: 'Community',   id: 'nav-community', moduleId: null      },
+  { to: '/settings',  icon: Settings,        label: 'Settings',    id: 'nav-settings',  moduleId: null      },
 ];
 
 const PAGE_COLORS = {
@@ -34,6 +36,11 @@ export default function Sidebar({ connected }) {
   const location = useLocation();
   const accentColor = PAGE_COLORS[location.pathname] || 'var(--accent-primary)';
   const { logout } = useAuth();
+  const { modules } = useSettings();
+
+  const activeModuleIds = new Set(
+    modules.filter(m => m.active).map(m => m.id)
+  );
 
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`} style={{ '--page-accent': accentColor }}>
@@ -56,22 +63,37 @@ export default function Sidebar({ connected }) {
         </button>
       </div>
 
-      {/* Nav Items */}
       <nav style={{ flex:1, padding:'8px 12px', display:'flex', flexDirection:'column', gap:4, overflowY:'auto' }}>
-        {NAV_ITEMS.map(({ to, icon: Icon, label, id }) => (
-          <NavLink
-            key={to}
-            to={to}
-            id={id}
-            end={to === '/'}
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            title={collapsed ? label : undefined}
-            style={({ isActive }) => isActive ? { '--active-accent': PAGE_COLORS[to] } : {}}
-          >
-            <Icon className="nav-icon" size={20} />
-            <span className="nav-label">{label}</span>
-          </NavLink>
-        ))}
+        {NAV_ITEMS.map(({ to, icon: Icon, label, id, moduleId }) => {
+          const locked = moduleId !== null && !activeModuleIds.has(moduleId);
+          if (locked) return (
+            <div
+              key={to}
+              id={id}
+              title={`🔒 ${label} — purchase on SmartEnv website to unlock`}
+              className="nav-item"
+              style={{ opacity:0.35, cursor:'not-allowed', pointerEvents:'none' }}
+            >
+              <Icon className="nav-icon" size={20} />
+              {!collapsed && <span className="nav-label">{label}</span>}
+              {!collapsed && <Lock size={12} style={{ marginLeft:'auto', flexShrink:0 }} />}
+            </div>
+          );
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              id={id}
+              end={to === '/'}
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              title={collapsed ? label : undefined}
+              style={({ isActive }) => isActive ? { '--active-accent': PAGE_COLORS[to] } : {}}
+            >
+              <Icon className="nav-icon" size={20} />
+              <span className="nav-label">{label}</span>
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Connection and Actions Footer */}
