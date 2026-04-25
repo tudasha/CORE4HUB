@@ -153,13 +153,17 @@ export default function AIAssistant({ sensorData }) {
     }
     
     // Pre-load voices for natural TTS
-    window.speechSynthesis.onvoiceschanged = () => {
-      window.speechSynthesis.getVoices();
-    };
+    if (window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+      };
+    }
 
     // Cleanup TTS
     return () => {
-      window.speechSynthesis.cancel();
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
     };
   }, [voiceAutoSend, language]); // Re-bind if lang or autoSend changes
 
@@ -174,7 +178,7 @@ export default function AIAssistant({ sensorData }) {
   };
 
   const playTTS = (text) => {
-    if (!voiceEngine) return;
+    if (!voiceEngine || !window.speechSynthesis) return;
     window.speechSynthesis.cancel(); // Stop current
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = language;
