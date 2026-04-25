@@ -25,33 +25,41 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (email, password) => {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
-    const data = await res.json();
-    if (res.ok) {
-      localStorage.setItem('token', data.token);
-      setUser(data.user);
-      return { success: true };
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem('token', data.token);
+        setUser(data.user);
+        return { success: true };
+      }
+      return { success: false, error: data.error || 'Server error.' };
+    } catch (err) {
+      return { success: false, error: 'Network error or CORS issue. Cannot reach backend.' };
     }
-    return { success: false, error: data.error };
   };
 
   const register = async (name, email, password) => {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password })
-    });
-    const data = await res.json();
-    if (res.ok) {
-      localStorage.setItem('token', data.token);
-      setUser(data.user);
-      return { success: true };
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem('token', data.token);
+        setUser(data.user);
+        return { success: true };
+      }
+      return { success: false, error: data.error || 'Server error.' };
+    } catch (err) {
+      return { success: false, error: 'Network error or CORS issue. Cannot reach backend.' };
     }
-    return { success: false, error: data.error };
   };
 
   const logout = () => {
