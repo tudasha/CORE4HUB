@@ -1,4 +1,5 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
 
 const SettingsContext = createContext();
 
@@ -12,11 +13,23 @@ export const DEFAULT_MODULES = [
 ];
 
 export function SettingsProvider({ children }) {
+  const { user } = useAuth();
   const [language, setLanguage] = useState('en-US'); // Options: 'en-US', 'ro-RO'
   const [voiceAutoSend, setVoiceAutoSend] = useState(false); // true: auto-send, false: manual check
   const [voiceEngine, setVoiceEngine] = useState(true); // TTS Reader toggle
   const [requireAiConfirmation, setRequireAiConfirmation] = useState(true); // Auto-apply AI suggestions
   const [modules, setModules] = useState(DEFAULT_MODULES);
+
+  useEffect(() => {
+    if (user && user.modules && Array.isArray(user.modules)) {
+      setModules(DEFAULT_MODULES.map(m => ({
+        ...m,
+        active: user.modules.includes(m.id)
+      })));
+    } else {
+      setModules(DEFAULT_MODULES);
+    }
+  }, [user]);
 
   const toggleModule = (id) => {
     setModules(prev => prev.map(m => m.id === id ? { ...m, active: !m.active } : m));
