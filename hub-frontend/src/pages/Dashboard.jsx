@@ -101,6 +101,7 @@ export default function Dashboard({ sensorData, alerts = [], dismissAlert, conne
       const prompt = `Analyze this smart home data and output EXACTLY a JSON array of 1 to 3 suggestions.
 User's Active Modules: ${activeModuleList}
 IMPORTANT: ONLY suggest things relevant to the user's active modules. Ignore all other domains.
+${activeModuleList === 'None' ? 'CRITICAL: The user has NO active modules. You MUST output an empty array: []' : ''}
 
 Available Data (active modules only):
 ${hasModule('weather') ? `- Outdoor Weather: ${weatherRes?.temp ?? '?'}°C, ${weatherRes?.condition ?? 'unknown'}, Humidity: ${weatherRes?.humidity ?? '?'}%
@@ -185,7 +186,12 @@ NO markdown, ONLY JSON array.`;
 
   const allAlerts = [
     ...suggestions.map(s => ({ ...s, _origId: s.id, id: `s_${s.id}` })),
-    ...alerts.slice(0, 3),
+    ...alerts.filter(a => {
+      // Filter out alerts for modules the user doesn't have
+      if (a.message?.includes('Electric spike') && !modules.find(m => m.id === 'energy')?.active) return false;
+      if (a.message?.includes('Motion detected') && !modules.find(m => m.id === 'security')?.active) return false;
+      return true;
+    }).slice(0, 3),
   ];
 
   const sd = sensorData || {};
