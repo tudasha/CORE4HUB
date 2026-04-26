@@ -73,6 +73,28 @@ export function useWebSocket() {
 
   useEffect(() => {
     connect();
+    
+    // Fetch initial steps on mount so AI assistant has them before any live updates arrive
+    const fetchInitialSteps = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const api = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const res = await fetch(`${api}/api/health/steps`, { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (data.history?.length) {
+          const last = data.history[data.history.length - 1];
+          setSensorData(prev => ({
+            ...prev,
+            steps: parseInt(last.steps)
+          }));
+        }
+      } catch (e) {
+        // silent fail
+      }
+    };
+    fetchInitialSteps();
+    
     return () => ws.current?.close();
   }, [connect]);
 
