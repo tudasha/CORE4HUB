@@ -7,7 +7,7 @@ function StatCard({ icon: Icon, label, value, unit, color }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <div style={{
           width: '40px', height: '40px', borderRadius: '12px',
-          background: `${color}15`, color: color,
+          background: `${color}15`, color,
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>
           <Icon size={20} />
@@ -51,48 +51,50 @@ export default function Indoors({ sensorData }) {
         </div>
       )}
 
-      {/* Temperature & Pressure (Arduino: Temp + Pressure) */}
-      {hasClimate && (
+      {/* Temp + Pressure + Light Intensity — all 3 come from the same Arduino */}
+      {(hasClimate || hasLight) && (
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: '1.2rem', marginBottom: 16, color: 'var(--text-primary)' }}>Climate & Atmosphere</h2>
           <div className="dashboard-grid">
-            <StatCard icon={Thermometer} label="Temperature" value={sd.temperature} unit="°C"  color="var(--accent-amber)" />
-            <StatCard icon={Gauge}       label="Pressure"    value={sd.pressure}    unit="hPa" color="var(--accent-primary)" />
+            {hasClimate && (
+              <>
+                <StatCard icon={Thermometer} label="Temperature"    value={sd.temperature} unit="°C"  color="var(--accent-amber)" />
+                <StatCard icon={Gauge}       label="Pressure"       value={sd.pressure}    unit="hPa" color="var(--accent-primary)" />
+              </>
+            )}
+            {hasLight && (
+              <StatCard icon={Lightbulb} label="Light Intensity" value={sd.lightLevel} unit="lux" color="#eab308" />
+            )}
           </div>
         </div>
       )}
 
-      {/* Light Intensity & Motion */}
-      {(hasLight || hasMotion) && (
+      {/* Motion Sensor */}
+      {hasMotion && (
         <div style={{ marginBottom: 32 }}>
-          <h2 style={{ fontSize: '1.2rem', marginBottom: 16, color: 'var(--text-primary)' }}>Security & Ambience</h2>
+          <h2 style={{ fontSize: '1.2rem', marginBottom: 16, color: 'var(--text-primary)' }}>Security</h2>
           <div className="dashboard-grid">
-            {hasLight && (
-              <StatCard icon={Lightbulb} label="Light Intensity" value={sd.lightLevel} unit="lux" color="#eab308" />
-            )}
-            {hasMotion && (
-              <div className="glass-card" style={{
-                padding: '24px', display: 'flex', flexDirection: 'column',
-                justifyContent: 'center', alignItems: 'center', gap: '16px',
-                background: sd.motionDetected ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-glass)'
+            <div className="glass-card" style={{
+              padding: '24px', display: 'flex', flexDirection: 'column',
+              justifyContent: 'center', alignItems: 'center', gap: '16px',
+              background: sd.motionDetected ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-glass)'
+            }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: 32,
+                background: sd.motionDetected ? 'var(--accent-rose)' : 'rgba(255,255,255,0.05)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s'
               }}>
-                <div style={{
-                  width: 64, height: 64, borderRadius: 32,
-                  background: sd.motionDetected ? 'var(--accent-rose)' : 'rgba(255,255,255,0.05)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s'
-                }}>
-                  <Activity size={32} color={sd.motionDetected ? '#fff' : 'var(--text-muted)'} />
+                <Activity size={32} color={sd.motionDetected ? '#fff' : 'var(--text-muted)'} />
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '1.1rem', fontWeight: 600, color: sd.motionDetected ? 'var(--accent-rose)' : 'var(--text-secondary)' }}>
+                  {sd.motionDetected ? 'Motion Detected!' : 'All Clear'}
                 </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 600, color: sd.motionDetected ? 'var(--accent-rose)' : 'var(--text-secondary)' }}>
-                    {sd.motionDetected ? 'Motion Detected!' : 'All Clear'}
-                  </div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 4 }}>
-                    {sd.motionDetected ? 'Movement currently detected.' : 'No movement detected.'}
-                  </div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                  {sd.motionDetected ? 'Movement currently detected.' : 'No movement detected.'}
                 </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
       )}
