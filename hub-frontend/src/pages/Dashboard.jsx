@@ -80,20 +80,27 @@ export default function Dashboard({ sensorData, alerts = [], dismissAlert, conne
     return () => clearInterval(t2);
   }, []);
 
-  // Fetch today's step count from Core4Health DB
+  // Fetch today's step count from Core4Health DB with 3-second polling
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    const api = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-    fetch(`${api}/api/health/steps`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(data => {
+    const fetchSteps = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const api = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      try {
+        const r = await fetch(`${api}/api/health/steps`, { headers: { Authorization: `Bearer ${token}` } });
+        const data = await r.json();
         if (data.history?.length) {
           const last = data.history[data.history.length - 1];
           setRealSteps(parseInt(last.steps));
         }
-      })
-      .catch(() => {});
+      } catch (e) {
+        // silent fail
+      }
+    };
+    
+    fetchSteps(); // initial fetch
+    const t = setInterval(fetchSteps, 3000);
+    return () => clearInterval(t);
   }, []);
 
   const fetchLiveSuggestions = async () => {
@@ -202,12 +209,14 @@ NO markdown, ONLY JSON array.`;
     if (suggestion?.deviceAction) toggleDevice(suggestion.deviceAction.device, suggestion.deviceAction.on);
     
     // Flash LEDs Green on approve as a physical visual feedback
-    fetch('http://10.224.220.44/?c=00FF00&b=250', { mode: 'no-cors' }).catch(() => {});
+    const flashImg = new Image();
+    flashImg.src = 'http://10.224.220.44/?c=00FF00&b=250';
     // Optionally turn back off after 1.5s if Lighting was off, but we'll just let it flash and stay, or user can toggle.
     setTimeout(() => {
       const isLightingOn = devices.find(d => d.name === 'Lighting')?.on;
       const url = isLightingOn ? 'http://10.224.220.44/?c=FF0042&b=250' : 'http://10.224.220.44/?c=000000&b=0';
-      fetch(url, { mode: 'no-cors' }).catch(() => {});
+      const revertImg = new Image();
+      revertImg.src = url;
     }, 1500);
 
     setApprovedIds(prev => [...prev, origId]);

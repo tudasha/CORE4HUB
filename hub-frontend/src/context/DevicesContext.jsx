@@ -39,11 +39,9 @@ export function DevicesProvider({ children }) {
 
       console.log(`[Lighting] → ${url}`);
       try {
-        if (Capacitor.isNativePlatform()) {
-          await CapacitorHttp.get({ url });
-        } else {
-          await fetch(url, { mode: 'no-cors' });
-        }
+        // Bulletproof way to fire a background GET request without CORS/MixedContent blocks
+        const img = new Image();
+        img.src = url;
       } catch (err) {
         console.error(`[Lighting] Failed to reach ${ip}:`, err);
       }
