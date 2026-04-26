@@ -386,7 +386,22 @@ app.post('/api/health/steps', authenticateToken, async (req, res) => {
       'INSERT INTO health_steps (user_id, steps, goal) VALUES ($1, $2, $3) RETURNING *',
       [req.user.id, steps, goal]
     );
-    broadcast({ type: 'HEALTH_UPDATE', kind: 'steps', data: result.rows[0], userId: req.user.id, timestamp: new Date() });
+
+    // Fetch the total sum for today to broadcast correctly
+    const sumResult = await pool.query(
+      `SELECT SUM(steps) AS total_steps FROM health_steps 
+       WHERE user_id = $1 AND date_trunc('day', recorded_at) = date_trunc('day', NOW())`,
+      [req.user.id]
+    );
+    const totalStepsToday = sumResult.rows[0].total_steps;
+
+    broadcast({ 
+      type: 'HEALTH_UPDATE', 
+      kind: 'steps', 
+      data: { steps: parseInt(totalStepsToday), goal }, 
+      userId: req.user.id, 
+      timestamp: new Date() 
+    });
     res.json({ success: true, record: result.rows[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
