@@ -73,10 +73,27 @@ export default function Dashboard({ sensorData, alerts = [], dismissAlert, conne
   const [approvedIds, setApprovedIds] = useState([]);
   const [autoAppliedIds, setAutoAppliedIds] = useState([]);
   const [now, setNow] = useState(new Date());
+  const [realSteps, setRealSteps] = useState(null); // from Core4Health DB
 
   useEffect(() => {
     const t2 = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t2);
+  }, []);
+
+  // Fetch today's step count from Core4Health DB
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const api = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    fetch(`${api}/api/health/steps`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(data => {
+        if (data.history?.length) {
+          const last = data.history[data.history.length - 1];
+          setRealSteps(parseInt(last.steps));
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const fetchLiveSuggestions = async () => {
@@ -237,21 +254,18 @@ NO markdown, ONLY JSON array.`;
         
         {modules.find(m => m.id === 'health')?.active && (
           <>
-            <StatCard icon={Heart}        label="Heart Rate"   value={sd.heartRate ?? '--'}   unit="bpm" color="var(--accent-rose)"     pulse />
-            <StatCard icon={Activity}     label="SpO₂"         value={sd.oxygenLevel ?? '--'} unit="%"   color="var(--accent-emerald)"  />
-            <StatCard icon={Footprints}   label="Steps Today"  value={(sd.steps ?? 0).toLocaleString()} unit="" color="var(--accent-primary)" />
+            <StatCard icon={Heart}      label="Heart Rate"  value={sensorData?.heartRate ?? '--'}   unit="bpm" color="var(--accent-rose)"    pulse />
+            <StatCard icon={Activity}   label="SpO\u2082"       value={sensorData?.oxygenLevel ?? '--'} unit="%"   color="var(--accent-emerald)" />
+            <StatCard icon={Footprints} label="Steps Today" value={realSteps != null ? realSteps.toLocaleString() : '--'} unit="" color="var(--accent-primary)" />
           </>
         )}
 
         {modules.find(m => m.id === 'energy')?.active && (
-          <StatCard icon={Zap}          label="Electric Flow" value={sd.electricFlow ?? '--'} unit="A" color="#eab308"               />
+          <StatCard icon={Zap} label="Electric Flow" value={sd.electricFlow ?? '--'} unit="A" color="#eab308" />
         )}
 
         {modules.find(m => m.id === 'indoor_climate')?.active && (
-          <>
-            <StatCard icon={Thermometer}  label="Indoor Temp"  value={sd.temperature ?? '--'} unit="°C" color="var(--accent-amber)" />
-            <StatCard icon={Droplets}     label="Indoor Hum"   value={sd.humidity ?? '--'}    unit="%"  color="var(--accent-teal)" />
-          </>
+          <StatCard icon={Thermometer} label="Indoor Temp" value={sd.temperature ?? '--'} unit="°C" color="var(--accent-amber)" />
         )}
       </div>
 
