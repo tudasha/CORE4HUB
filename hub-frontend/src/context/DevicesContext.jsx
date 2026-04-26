@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { CapacitorHttp } from '@capacitor/core';
 
 const DevicesContext = createContext();
 
@@ -18,7 +20,7 @@ export function DevicesProvider({ children }) {
 
   const setArduinoIp = (ip) => { arduinoIpRef.current = ip; };
 
-  const toggleDevice = (name, state) => {
+  const toggleDevice = async (name, state) => {
     // Compute target state upfront from current devices snapshot
     const current = devices.find(d => d.name === name);
     const targetState = state !== undefined ? state : !current?.on;
@@ -36,8 +38,15 @@ export function DevicesProvider({ children }) {
         : `http://${ip}/?c=000000&b=0`;
 
       console.log(`[Lighting] → ${url}`);
-      fetch(url, { mode: 'no-cors' })
-        .catch(err => console.error(`[Lighting] Failed to reach ${ip}:`, err));
+      try {
+        if (Capacitor.isNativePlatform()) {
+          await CapacitorHttp.get({ url });
+        } else {
+          await fetch(url, { mode: 'no-cors' });
+        }
+      } catch (err) {
+        console.error(`[Lighting] Failed to reach ${ip}:`, err);
+      }
     }
   };
 

@@ -85,6 +85,24 @@ export default function Health({ sensorData }) {
 
   useEffect(() => { fetchAll(); }, []);
 
+  // Poll live step counter every 3 seconds
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${API}/api/health/steps`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await res.json();
+        if (data.history?.length) {
+          const last = data.history[data.history.length - 1];
+          setSteps({ steps: parseInt(last.steps), goal: parseInt(last.goal) });
+        }
+      } catch (e) {
+        // Silent catch for background polling
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
   const deleteMeal = async (id) => {
     await fetch(`${API}/api/health/meals/${id}`, { method:'DELETE', headers: authHeaders });
     setMeals(prev => prev.filter(m => m.id !== id));
