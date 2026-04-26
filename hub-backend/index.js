@@ -313,48 +313,67 @@ app.post('/api/ai/messages', authenticateToken, async (req, res) => {
   }
 });
 
-// Secure Proxy for AI — now using OpenAI (ChatGPT) instead of Gemini
+// Secure Proxy for Gemini AI — with automatic model fallback
 app.post('/api/gemini', async (req, res) => {
   const { messages } = req.body;
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) return res.status(500).json({ error: 'Missing OPENAI_API_KEY in backend .env' });
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return res.status(500).json({ error: 'Missing GEMINI_API_KEY in backend .env' });
 
-  try {
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-4o-mini',
-        messages: messages.map(msg => ({
-          role: msg.role === 'assistant' ? 'assistant' : 'user',
-          content: msg.content,
-        })),
-        temperature: 0.7,
-        max_tokens: 1200,
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${key}`,
-        },
+  // Try models in order until one works (handles quota/demand spikes)
+  const MODELS = [
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
+  ];
+
+  const payload = {
+    contents: messages.map(msg => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    })),
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 1200,
+    }
+  };
+
+  let lastError = null;
+  for (const model of MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+      const response = await axios.post(url, payload, { headers: { 'Content-Type': 'application/json' } });
+      
+      // Gemini sometimes returns 200 with an error body — check for it
+      if (response.data?.error) {
+        const errMsg = response.data.error.message || JSON.stringify(response.data.error);
+        const isTransient = errMsg.includes('quota') || errMsg.includes('demand') || errMsg.includes('429') || errMsg.includes('503');
+        if (isTransient) {
+          console.warn(`[Gemini] Model ${model} busy/quota, trying next...`);
+          lastError = errMsg;
+          continue; // try next model
+        }
+        return res.json({ error: errMsg });
       }
-    );
 
-    // Return in a shape the frontend can use:
-    // Frontend reads: data.candidates[0].content.parts[0].text
-    // We map OpenAI's response to match that shape
-    const text = response.data.choices?.[0]?.message?.content || '';
-    console.log('[OpenAI] Success');
-    return res.json({
-      candidates: [{ content: { parts: [{ text }] } }]
-    });
-  } catch (err) {
-    const status = err.response?.status;
-    const errMsg = err.response?.data?.error?.message || err.message;
-    console.error(`[OpenAI] Error (${status}):`, errMsg);
-    return res.status(status || 500).json({ error: errMsg });
+      console.log(`[Gemini] Success with model: ${model}`);
+      return res.json(response.data);
+    } catch (err) {
+      const status = err.response?.status;
+      const errMsg = err.response?.data?.error?.message || err.message;
+      const isTransient = status === 429 || status === 503 || errMsg?.includes('quota') || errMsg?.includes('demand');
+      if (isTransient) {
+        console.warn(`[Gemini] Model ${model} error (${status}), trying next...`);
+        lastError = errMsg;
+        continue;
+      }
+      // Non-transient error (like invalid key) — fail immediately
+      return res.status(500).json({ error: errMsg });
+    }
   }
-});
 
+  // All models failed
+  res.status(503).json({ error: lastError || 'All Gemini models are currently unavailable. Please try again in a moment.' });
+});
 
 
 // ── Core4Health: Step Counter API ───────────────────────────
@@ -450,17 +469,31 @@ app.delete('/api/health/meals/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/food/ai-estimate', async (req, res) => {
   const { text, imageBase64 } = req.body;
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) return res.status(500).json({ error: 'Missing OPENAI_API_KEY in backend .env' });
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return res.status(500).json({ error: 'Missing GEMINI_API_KEY in backend .env' });
 
   if (!text && !imageBase64) {
     return res.status(400).json({ error: 'Provide either text or imageBase64' });
   }
 
   try {
-    const contentParts = [];
+    const parts = [];
+    if (text) {
+      parts.push({ text: `Analyze this food: "${text}". Estimate the macros per reasonable serving.` });
+    }
+    if (imageBase64) {
+      // imageBase64 comes as 'data:image/jpeg;base64,...'
+      const base64Data = imageBase64.split(',')[1] || imageBase64;
+      const mimeType = imageBase64.split(';')[0].split(':')[1] || 'image/jpeg';
+      parts.push({
+        inlineData: { mimeType, data: base64Data }
+      });
+      if (!text) {
+        parts.push({ text: 'Analyze this image of food and estimate the macros for the whole meal shown.' });
+      }
+    }
 
-    const sysPrompt = `You are a nutrition expert API. Respond ONLY with a valid, clean JSON object. Do not wrap it in markdown. Do not include any explanations.
+    const sysInstruct = `You are a nutrition expert API. Respond ONLY with a valid, clean JSON object. Do not wrap it in markdown. Do not include any explanations.
 Format exactly like this:
 {
   "name": "A concise, capitalized name for the food (max 4 words)",
@@ -470,51 +503,58 @@ Format exactly like this:
   "fat": 10
 }`;
 
-    if (text) {
-      contentParts.push({ type: 'text', text: `Analyze this food: "${text}". Estimate the macros per reasonable serving.` });
-    }
-    if (imageBase64) {
-      contentParts.push({
-        type: 'image_url',
-        image_url: { url: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}` }
-      });
-      if (!text) {
-        contentParts.push({ type: 'text', text: 'Analyze this image of food and estimate the macros for the whole meal shown.' });
+    const payload = {
+      systemInstruction: { parts: [{ text: sysInstruct }] },
+      contents: [{ role: 'user', parts }],
+      generationConfig: { temperature: 0.3, responseMimeType: "application/json" }
+    };
+
+    const MODELS = [
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-lite',
+    ];
+
+    let lastError = null;
+    for (const model of MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+        const response = await axios.post(url, payload, { headers: { 'Content-Type': 'application/json' } });
+        
+        if (response.data?.error) {
+          const errMsg = response.data.error.message || JSON.stringify(response.data.error);
+          const isTransient = errMsg.includes('quota') || errMsg.includes('demand') || errMsg.includes('429') || errMsg.includes('503') || errMsg.includes('not found');
+          if (isTransient) {
+            lastError = errMsg;
+            continue;
+          }
+          return res.status(500).json({ error: errMsg });
+        }
+
+        const modelText = response.data.candidates[0].content.parts[0].text;
+        const cleanText = modelText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanText);
+        return res.json({ success: true, estimation: parsed });
+      } catch (err) {
+        const status = err.response?.status;
+        const errMsg = err.response?.data?.error?.message || err.message;
+        const isTransient = status === 429 || status === 503 || status === 404 || errMsg?.includes('quota') || errMsg?.includes('demand');
+        if (isTransient) {
+          lastError = errMsg;
+          continue;
+        }
+        return res.status(500).json({ error: errMsg });
       }
     }
 
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: imageBase64 ? 'gpt-4o-mini' : 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: sysPrompt },
-          { role: 'user', content: contentParts },
-        ],
-        temperature: 0.3,
-        max_tokens: 300,
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${key}`,
-        },
-      }
-    );
-
-    const modelText = response.data.choices?.[0]?.message?.content || '{}';
-    const cleanText = modelText.replace(/```json/gi, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleanText);
-    return res.json({ success: true, estimation: parsed });
+    return res.status(500).json({ error: `Failed to estimate macros after trying all models. Last error: ${lastError}` });
   } catch (err) {
-    console.error('[OpenAI AI Estimate Error]', err?.response?.data || err.message);
+    console.error('[Gemini AI Estimate Error]', err?.response?.data || err.message);
     res.status(500).json({ error: 'Failed to estimate macros with AI. Please try again.' });
   }
 });
 
-
 // ── Core4Health: Barcode Scanner Proxy ────────────────────────
-
 
 app.get('/api/food/barcode/:barcode', async (req, res) => {
   const { barcode } = req.params;
