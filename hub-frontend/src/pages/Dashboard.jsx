@@ -306,8 +306,8 @@ NO markdown, ONLY JSON array.`;
         <div className="glass-card p-5">
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
             <span style={{ fontSize:'0.8rem', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-secondary)' }}>🚍 Live Transit – Tranzy Cluj</span>
-            <span className={`alert-badge ${trafficRes?.level === 'Running' ? 'alert-success' : 'alert-info'}`}>
-              {trafficRes ? trafficRes.level : 'Loading...'}
+            <span className={`alert-badge ${trafficRes?.level === 'Running' ? 'alert-success' : trafficRes?.level === 'Unavailable' ? 'alert-warning' : 'alert-info'}`}>
+              {trafficRes ? trafficRes.level : 'Connecting...'}
             </span>
           </div>
           <div className="metric-value" style={{ color:'var(--accent-teal)', marginBottom:4 }}>
@@ -317,8 +317,12 @@ NO markdown, ONLY JSON array.`;
           <div className="metric-label" style={{ marginBottom:16 }}>Relevant to your schedule</div>
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {!trafficRes ? (
-               <div style={{ fontSize:'0.8rem', color:'var(--text-muted)' }}>Synching real-time GPS...</div>
-            ) : trafficRes.routes?.map((r, i) => (
+              <div style={{ fontSize:'0.8rem', color:'var(--text-muted)' }}>Connecting to Tranzy GPS...</div>
+            ) : !trafficRes.success || trafficRes.routes?.length === 0 ? (
+              <div style={{ fontSize:'0.8rem', color:'var(--text-muted)', padding:'12px 0', textAlign:'center' }}>
+                No live bus data available right now.
+              </div>
+            ) : trafficRes.routes.map((r, i) => (
               <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 12px', background:'rgba(255,255,255,0.03)', borderRadius:8 }}>
                 <span style={{ fontSize:'0.78rem', color:'var(--text-secondary)' }}>{r.name}</span>
                 <div style={{ display:'flex', alignItems:'center', gap:8 }}>

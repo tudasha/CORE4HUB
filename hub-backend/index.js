@@ -8,6 +8,7 @@ import http from 'http';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -76,6 +77,25 @@ async function initDb() {
         start_time TIMESTAMPTZ,
         end_time TIMESTAMPTZ,
         color TEXT DEFAULT '#6366f1'
+      );
+      CREATE TABLE IF NOT EXISTS health_steps (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        steps INTEGER NOT NULL DEFAULT 0,
+        goal INTEGER NOT NULL DEFAULT 10000,
+        recorded_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS health_meals (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        name TEXT NOT NULL,
+        icon TEXT DEFAULT '🍽️',
+        calories FLOAT DEFAULT 0,
+        protein FLOAT DEFAULT 0,
+        carbs FLOAT DEFAULT 0,
+        fat FLOAT DEFAULT 0,
+        meal_type TEXT DEFAULT 'snack',
+        recorded_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);
     
@@ -368,6 +388,151 @@ app.post('/api/gemini', async (req, res) => {
 });
 
 
+// ── Core4Health: Step Counter API ───────────────────────────
+
+app.post('/api/health/steps', authenticateToken, async (req, res) => {
+  const { steps, goal = 10000 } = req.body;
+  if (typeof steps !== 'number') return res.status(400).json({ error: 'steps must be a number' });
+  try {
+    const result = await pool.query(
+      'INSERT INTO health_steps (user_id, steps, goal) VALUES ($1, $2, $3) RETURNING *',
+      [req.user.id, steps, goal]
+    );
+    broadcast({ type: 'HEALTH_UPDATE', kind: 'steps', data: result.rows[0], userId: req.user.id, timestamp: new Date() });
+    res.json({ success: true, record: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/health/steps', authenticateToken, async (req, res) => {
+  const { days = 7 } = req.query;
+  try {
+    const result = await pool.query(
+      `SELECT date_trunc('day', recorded_at) AS day, SUM(steps) AS steps, MAX(goal) AS goal
+       FROM health_steps WHERE user_id = $1 AND recorded_at >= NOW() - INTERVAL '${parseInt(days)} days'
+       GROUP BY day ORDER BY day ASC`,
+      [req.user.id]
+    );
+    res.json({ success: true, history: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Core4Health: Food / Meal Log API ────────────────────────
+
+app.post('/api/health/meals', authenticateToken, async (req, res) => {
+  const { name, icon = '🍽️', calories = 0, protein = 0, carbs = 0, fat = 0, meal_type = 'snack' } = req.body;
+  if (!name) return res.status(400).json({ error: 'name required' });
+  try {
+    const result = await pool.query(
+      'INSERT INTO health_meals (user_id, name, icon, calories, protein, carbs, fat, meal_type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
+      [req.user.id, name, icon, calories, protein, carbs, fat, meal_type]
+    );
+    broadcast({ type: 'HEALTH_UPDATE', kind: 'meal', data: result.rows[0], userId: req.user.id, timestamp: new Date() });
+    res.json({ success: true, meal: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/health/meals', authenticateToken, async (req, res) => {
+  const { date } = req.query; // YYYY-MM-DD, defaults to today
+  const targetDate = date || new Date().toISOString().split('T')[0];
+  try {
+    const result = await pool.query(
+      `SELECT * FROM health_meals WHERE user_id = $1
+       AND DATE(recorded_at AT TIME ZONE 'UTC') = $2
+       ORDER BY recorded_at ASC`,
+      [req.user.id, targetDate]
+    );
+    res.json({ success: true, meals: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/health/meals/:id', authenticateToken, async (req, res) => {
+  try {
+    await pool.query(
+      'DELETE FROM health_meals WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.user.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── FatSecret Food Search Proxy (OAuth 1.0a) ─────────────────
+
+function fatSecretSign(method, url, params, consumerKey, consumerSecret) {
+  const sortedParams = Object.keys(params).sort()
+    .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`)
+    .join('&');
+  const baseString = `${method}&${encodeURIComponent(url)}&${encodeURIComponent(sortedParams)}`;
+  const signingKey = `${encodeURIComponent(consumerSecret)}&`;
+  return crypto.createHmac('sha1', signingKey).update(baseString).digest('base64');
+}
+
+app.get('/api/food/search', async (req, res) => {
+  const { q, page = 0 } = req.query;
+  if (!q) return res.status(400).json({ error: 'query required' });
+
+  const consumerKey = process.env.FATSECRET_CONSUMER_KEY;
+  const consumerSecret = process.env.FATSECRET_CONSUMER_SECRET;
+  if (!consumerKey || !consumerSecret) return res.status(500).json({ error: 'FatSecret credentials not configured' });
+
+  const url = 'https://platform.fatsecret.com/rest/server.api';
+  const params = {
+    method: 'foods.search',
+    search_expression: q,
+    page_number: String(page),
+    max_results: '20',
+    format: 'json',
+    oauth_consumer_key: consumerKey,
+    oauth_nonce: crypto.randomBytes(16).toString('hex'),
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: String(Math.floor(Date.now() / 1000)),
+    oauth_version: '1.0',
+  };
+  params.oauth_signature = fatSecretSign('GET', url, params, consumerKey, consumerSecret);
+
+  try {
+    const response = await axios.get(url, { params });
+    res.json(response.data);
+  } catch (err) {
+    res.status(500).json({ error: err.response?.data || err.message });
+  }
+});
+
+app.get('/api/food/:id', async (req, res) => {
+  const consumerKey = process.env.FATSECRET_CONSUMER_KEY;
+  const consumerSecret = process.env.FATSECRET_CONSUMER_SECRET;
+  if (!consumerKey || !consumerSecret) return res.status(500).json({ error: 'FatSecret credentials not configured' });
+
+  const url = 'https://platform.fatsecret.com/rest/server.api';
+  const params = {
+    method: 'food.get.v4',
+    food_id: req.params.id,
+    format: 'json',
+    oauth_consumer_key: consumerKey,
+    oauth_nonce: crypto.randomBytes(16).toString('hex'),
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: String(Math.floor(Date.now() / 1000)),
+    oauth_version: '1.0',
+  };
+  params.oauth_signature = fatSecretSign('GET', url, params, consumerKey, consumerSecret);
+
+  try {
+    const response = await axios.get(url, { params });
+    res.json(response.data);
+  } catch (err) {
+    res.status(500).json({ error: err.response?.data || err.message });
+  }
+});
+
 // ── External Live APIs (Proxy) ──────────────────────────────
 
 app.get('/api/weather', async (req, res) => {
@@ -453,19 +618,14 @@ app.get('/api/transit/live', async (req, res) => {
     }
     } // end if(key)
 
-    // Fallback: Safe structured format with Tranzy-like data just in case the key is invalid or API is down
+
+    // No live data available — return empty so UI shows no fake buses
     res.json({
-      success: true,
-      provider: 'Tranzy Scheduled',
-      message: 'Using static schedule fallback',
-      travelTime: 24,
-      level: 'Moderate',
-      incidents: 1,
-      routes: [
-        { name: 'Bus 24B — VIVO! -> Centre (To Gym)', duration: Math.floor(3 + Math.random() * 5), traffic: 'On Time' },
-        { name: 'Bus M26 — Florești -> Plopilor (To Office)', duration: Math.floor(6 + Math.random() * 8), traffic: 'Delayed' },
-        { name: 'Tram 102 — Mănăștur -> Gară (To Station)', duration: Math.floor(2 + Math.random() * 4), traffic: 'On Time' }
-      ]
+      success: false,
+      provider: 'Tranzy',
+      message: 'Live transit data unavailable',
+      level: 'Unavailable',
+      routes: []
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
