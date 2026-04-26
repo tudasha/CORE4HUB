@@ -498,16 +498,44 @@ Format exactly like this:
       generationConfig: { temperature: 0.3, responseMimeType: "application/json" }
     };
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
-    const response = await axios.post(url, payload, { headers: { 'Content-Type': 'application/json' } });
-    
-    if (response.data?.error) {
-      return res.status(500).json({ error: response.data.error.message });
+    const MODELS = [
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-lite',
+    ];
+
+    let lastError = null;
+    for (const model of MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+        const response = await axios.post(url, payload, { headers: { 'Content-Type': 'application/json' } });
+        
+        if (response.data?.error) {
+          const errMsg = response.data.error.message || JSON.stringify(response.data.error);
+          const isTransient = errMsg.includes('quota') || errMsg.includes('demand') || errMsg.includes('429') || errMsg.includes('503') || errMsg.includes('not found');
+          if (isTransient) {
+            lastError = errMsg;
+            continue;
+          }
+          return res.status(500).json({ error: errMsg });
+        }
+
+        const modelText = response.data.candidates[0].content.parts[0].text;
+        const parsed = JSON.parse(modelText);
+        return res.json({ success: true, estimation: parsed });
+      } catch (err) {
+        const status = err.response?.status;
+        const errMsg = err.response?.data?.error?.message || err.message;
+        const isTransient = status === 429 || status === 503 || status === 404 || errMsg?.includes('quota') || errMsg?.includes('demand');
+        if (isTransient) {
+          lastError = errMsg;
+          continue;
+        }
+        return res.status(500).json({ error: errMsg });
+      }
     }
 
-    const modelText = response.data.candidates[0].content.parts[0].text;
-    const parsed = JSON.parse(modelText);
-    res.json({ success: true, estimation: parsed });
+    return res.status(500).json({ error: `Failed to estimate macros after trying all models. Last error: ${lastError}` });
   } catch (err) {
     console.error('[Gemini AI Estimate Error]', err?.response?.data || err.message);
     res.status(500).json({ error: 'Failed to estimate macros with AI. Please try again.' });
