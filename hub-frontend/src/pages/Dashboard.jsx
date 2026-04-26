@@ -133,7 +133,8 @@ ${hasModule('weather') ? `- Outdoor Weather: ${weatherRes?.temp ?? '?'}°C, ${we
 - Wind: ${weatherRes?.wind ?? '?'} m/s` : ''}
 ${hasModule('energy') ? `- Energy Price: ${sensorData?.energyPrice ?? 130} EUR/MWh
 - Devices ON: ${devices.filter(d => d.on).map(d => d.name).join(', ') || 'None'}` : ''}
-${hasModule('indoor_climate') ? `- Indoor Temp: ${sensorData?.temperature ?? '?'}°C` : ''}
+${hasModule('indoor_climate') ? `- Indoor Temp: ${sensorData?.temperature ?? '?'}°C\n- Indoor Humidity: ${sensorData?.humidity ?? '?'}%` : ''}
+${hasModule('health') ? `- Steps Today: ${realSteps ?? '?'}` : ''}
 ${hasModule('weather') ? `\nWeather Forecast (next 3 days):\n${forecastStr}` : ''}
 
 Today's Schedule:
@@ -142,7 +143,8 @@ ${todaySchedule}
 Rules (ONLY apply rules for active modules):
 ${hasModule('weather') ? '1. WEATHER vs SCHEDULE: If a scheduled activity is outdoors (walk, run, gym, cycling) AND rain > 50% or wind > 10 m/s, warn and suggest rescheduling.' : ''}
 ${hasModule('energy') ? '2. ENERGY: If Energy Price > 100 and high-wattage devices (HVAC, Washing Machine, EV Charger) are ON, suggest turning them off.' : ''}
-${hasModule('weather') && hasModule('energy') ? '3. COMFORT: If Indoor Temp > Outdoor Temp by more than 4°C and no rain, suggest opening a window instead of AC.' : ''}
+${hasModule('indoor_climate') && hasModule('weather') ? '3. COMFORT: If Indoor Temp > Outdoor Temp by more than 4°C and no rain, suggest opening a window instead of AC. If Indoor Humidity is > 60%, suggest turning on dehumidifier/AC.' : ''}
+${hasModule('health') ? '4. HEALTH: If Steps Today < 5000 and it is past 16:00, suggest a walk.' : ''}
 
 Output format (ONLY valid JSON array, NO markdown):
 [
@@ -199,6 +201,15 @@ NO markdown, ONLY JSON array.`;
     if (suggestion?.scheduleAction) addScheduleItem(suggestion.scheduleAction);
     if (suggestion?.deviceAction) toggleDevice(suggestion.deviceAction.device, suggestion.deviceAction.on);
     
+    // Flash LEDs Green on approve as a physical visual feedback
+    fetch('http://10.224.220.44/?c=00FF00&b=250', { mode: 'no-cors' }).catch(() => {});
+    // Optionally turn back off after 1.5s if Lighting was off, but we'll just let it flash and stay, or user can toggle.
+    setTimeout(() => {
+      const isLightingOn = devices.find(d => d.name === 'Lighting')?.on;
+      const url = isLightingOn ? 'http://10.224.220.44/?c=FF0042&b=250' : 'http://10.224.220.44/?c=000000&b=0';
+      fetch(url, { mode: 'no-cors' }).catch(() => {});
+    }, 1500);
+
     setApprovedIds(prev => [...prev, origId]);
     setSuggestions(prev => prev.filter(s => String(s.id) !== String(origId)));
   };
@@ -265,7 +276,10 @@ NO markdown, ONLY JSON array.`;
         )}
 
         {modules.find(m => m.id === 'indoor_climate')?.active && (
-          <StatCard icon={Thermometer} label="Indoor Temp" value={sd.temperature ?? '--'} unit="°C" color="var(--accent-amber)" />
+          <>
+            <StatCard icon={Thermometer} label="Indoor Temp" value={sd.temperature ?? '--'} unit="°C" color="var(--accent-amber)" />
+            <StatCard icon={Droplets}    label="Indoor Hum"  value={sd.humidity ?? '--'}    unit="%"  color="var(--accent-teal)" />
+          </>
         )}
       </div>
 

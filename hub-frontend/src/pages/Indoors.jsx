@@ -1,5 +1,5 @@
 import { useSettings } from '../context/SettingsContext';
-import { Thermometer, Gauge, Lightbulb, Activity } from 'lucide-react';
+import { Thermometer, Gauge, Lightbulb, Activity, Droplets } from 'lucide-react';
 
 function StatCard({ icon: Icon, label, value, unit, color }) {
   return (
@@ -56,9 +56,16 @@ export default function Indoors({ sensorData }) {
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: '1.2rem', marginBottom: 16, color: 'var(--text-primary)' }}>Climate & Atmosphere</h2>
           <div className="dashboard-grid">
-            <StatCard icon={Thermometer} label="Temperature"    value={sd.temperature} unit="°C"  color="var(--accent-amber)" />
-            <StatCard icon={Gauge}       label="Pressure"       value={sd.pressure}    unit="hPa" color="var(--accent-primary)" />
-            <StatCard icon={Lightbulb}   label="Light Intensity" value={sd.lightLevel} unit="lux" color="#eab308" />
+            {hasClimate && (
+              <>
+                <StatCard icon={Thermometer} label="Temperature"    value={sd.temperature} unit="°C"  color="var(--accent-amber)" />
+                <StatCard icon={Droplets}    label="Humidity"       value={sd.humidity}    unit="%"   color="var(--accent-teal)" />
+                <StatCard icon={Gauge}       label="Pressure"       value={sd.pressure}    unit="hPa" color="var(--accent-primary)" />
+              </>
+            )}
+            {hasLight && (
+              <StatCard icon={Lightbulb} label="Light Intensity" value={sd.lightLevel} unit="lux" color="#eab308" />
+            )}
           </div>
         </div>
       )}
