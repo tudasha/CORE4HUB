@@ -34,18 +34,24 @@ export function useSensorHistory(sensorData) {
       electricFlow: sensorData.electricFlow ?? null,
     });
 
-    // Prune old points
+    // Prune old points only when appending new data
     historyRef.current = historyRef.current.filter(p => p.ts >= cutoff);
 
     setSnapshot([...historyRef.current]);
   }, [sensorData]);
 
-  // Periodic prune in case sensorData stops updating
+  // Periodic prune — only update snapshot if the array actually shrank
   useEffect(() => {
     const id = setInterval(() => {
       const cutoff = Date.now() - WINDOW_MS;
-      historyRef.current = historyRef.current.filter(p => p.ts >= cutoff);
-      setSnapshot([...historyRef.current]);
+      const before = historyRef.current.length;
+      const pruned = historyRef.current.filter(p => p.ts >= cutoff);
+
+      // Only update state if entries were actually removed — avoids blank-screen re-renders
+      if (pruned.length !== before) {
+        historyRef.current = pruned;
+        setSnapshot([...historyRef.current]);
+      }
     }, PRUNE_INTERVAL_MS);
     return () => clearInterval(id);
   }, []);

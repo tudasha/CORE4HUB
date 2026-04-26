@@ -23,22 +23,17 @@ export function useWebSocket() {
         try {
           const msg = JSON.parse(e.data);
           if (msg.type === 'SENSOR_UPDATE') {
-            // Merge only non-indoor fields so real Arduino data is never overwritten
-            setSensorData(prev => ({
-              ...prev,
-              ...msg.data,
-              // Preserve real Arduino indoor readings if we already have them
-              ...(prev?.source === 'arduino' && {
-                temperature:   prev.temperature,
-                humidity:      prev.humidity,
-                pressure:      prev.pressure,
-                altitude:      prev.altitude,
-                lightLevel:    prev.lightLevel,
-                motionDetected: prev.motionDetected,
-                arduinoIp:     prev.arduinoIp,
-                source:        'arduino',
-              }),
-            }));
+            setSensorData(prev => {
+              const next = { ...prev, ...msg.data };
+              // Never overwrite valid Arduino sensor values with null/undefined
+              const arduinoFields = ['temperature', 'humidity', 'pressure', 'altitude', 'lightLevel', 'electricFlow', 'motionDetected'];
+              arduinoFields.forEach(f => {
+                if (prev?.[f] != null && next[f] == null) {
+                  next[f] = prev[f];
+                }
+              });
+              return next;
+            });
           }
           if (msg.type === 'ARDUINO_UPDATE') {
             // Real Arduino data — merge on top and mark source
