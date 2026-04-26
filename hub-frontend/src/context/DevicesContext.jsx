@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useRef } from 'react';
 
 const DevicesContext = createContext();
 
@@ -13,6 +13,10 @@ const INITIAL_DEVICES = [
 
 export function DevicesProvider({ children }) {
   const [devices, setDevices] = useState(INITIAL_DEVICES);
+  // Dynamic IP of the Arduino — updated whenever a WebSocket ARDUINO_UPDATE arrives
+  const arduinoIpRef = useRef(null);
+
+  const setArduinoIp = (ip) => { arduinoIpRef.current = ip; };
 
   const toggleDevice = (name, state) => {
     let targetState = state;
@@ -25,25 +29,29 @@ export function DevicesProvider({ children }) {
       return d;
     }));
 
-    // Trigger physical LEDs locally
+    // Trigger physical LEDs on the Arduino sender via its local IP
     if (name === 'Lighting') {
-      // We expect the browser to fire a local HTTP GET to the Arduino.
-      // Mode 'no-cors' prevents the browser from blocking the request due to CORS policies,
-      // since we only care about sending the command, not reading the response.
-      const url = targetState 
-        ? 'http://192.168.1.50/?c=FF0042&b=250' 
-        : 'http://192.168.1.50/?c=000000&b=0';
+      const ip = arduinoIpRef.current;
+      if (!ip) {
+        console.warn('Arduino IP not known yet — no LED command sent.');
+        return;
+      }
+      const url = targetState
+        ? `http://${ip}/?c=FF0042&b=250`
+        : `http://${ip}/?c=000000&b=0`;
 
+      console.log(`[Lighting] Sending LED command to Arduino at ${ip}:`, url);
       fetch(url, { mode: 'no-cors' })
-        .catch(err => console.error('Failed to communicate with Arduino at 192.168.1.50:', err));
+        .catch(err => console.error(`Failed to communicate with Arduino at ${ip}:`, err));
     }
   };
 
   return (
-    <DevicesContext.Provider value={{ devices, setDevices, toggleDevice }}>
+    <DevicesContext.Provider value={{ devices, setDevices, toggleDevice, setArduinoIp }}>
       {children}
     </DevicesContext.Provider>
   );
 }
 
 export const useDevices = () => useContext(DevicesContext);
+

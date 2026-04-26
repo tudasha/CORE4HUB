@@ -13,9 +13,9 @@ import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import { useWebSocket } from './hooks/useWebSocket';
-import { mockSensors } from './utils/mockData';
 import { useAuth } from './context/AuthContext';
 import { useSettings } from './context/SettingsContext';
+import { useDevices } from './context/DevicesContext';
 import { Loader, Lock } from 'lucide-react';
 
 function ProtectedRoute({ children }) {
@@ -54,13 +54,17 @@ function ModuleRoute({ moduleId, moduleIds, children }) {
 
 function MainLayout() {
   const { sensorData: wsSensorData, alerts, connected, dismissAlert } = useWebSocket();
-  const [sensorData, setSensorData] = useState(mockSensors());
-  const [collapsed, setCollapsed] = useState(false); // To implement collapse in Sidebar if needed
+  const { setArduinoIp } = useDevices();
+  const [sensorData, setSensorData] = useState(null); // null = waiting for Arduino, persists after first update
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
-    if (wsSensorData) { setSensorData(wsSensorData); return; }
-    const interval = setInterval(() => setSensorData(mockSensors()), 3000);
-    return () => clearInterval(interval);
+    if (wsSensorData) {
+      setSensorData(wsSensorData);
+      // Store the sender IP so LED commands can reach the correct Arduino
+      if (wsSensorData.arduinoIp) setArduinoIp(wsSensorData.arduinoIp);
+    }
+    // No mock fallback — data persists from last Arduino transmission
   }, [wsSensorData]);
 
   return (

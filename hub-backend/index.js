@@ -245,6 +245,11 @@ app.post('/api/arduino/data', async (req, res) => {
       );
     }
 
+    // Capture sender IP (used by frontend to send LED commands back to this device)
+    const senderIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+      || req.socket?.remoteAddress
+      || req.ip;
+
     // Build live sensor payload and broadcast to all connected dashboard clients
     const livePayload = {
       temperature:      temperature     ?? null,
@@ -254,6 +259,7 @@ app.post('/api/arduino/data', async (req, res) => {
       lightLevel:       light_level     ?? null,
       motionDetected:   motion_detected ?? false,
       deviceId:         device_id       || 'arduino-1',
+      arduinoIp:        senderIp,
       source:           'arduino',
     };
 
