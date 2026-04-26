@@ -19,28 +19,25 @@ export function DevicesProvider({ children }) {
   const setArduinoIp = (ip) => { arduinoIpRef.current = ip; };
 
   const toggleDevice = (name, state) => {
-    let targetState = state;
+    // Compute target state upfront from current devices snapshot
+    const current = devices.find(d => d.name === name);
+    const targetState = state !== undefined ? state : !current?.on;
 
-    setDevices(prev => prev.map(d => {
-      if (d.name === name) {
-        targetState = state !== undefined ? state : !d.on;
-        return { ...d, on: targetState };
-      }
-      return d;
-    }));
+    setDevices(prev => prev.map(d =>
+      d.name === name ? { ...d, on: targetState } : d
+    ));
 
-    // Trigger physical LEDs on the Arduino sender via its local IP
+    // Send LED command to Arduino when Lighting is toggled
     if (name === 'Lighting') {
-      // Use the IP received from the Arduino's POST payload (set via setArduinoIp).
-      // Falls back to the known static IP if the device hasn't connected yet.
       const ip = arduinoIpRef.current || '10.224.220.44';
+      // Format: http://<ip>/?c=<hex_color>&b=<brightness>
       const url = targetState
         ? `http://${ip}/?c=FF0042&b=250`
         : `http://${ip}/?c=000000&b=0`;
 
-      console.log(`[Lighting] Sending LED command to ${ip}:`, url);
+      console.log(`[Lighting] → ${url}`);
       fetch(url, { mode: 'no-cors' })
-        .catch(err => console.error(`Failed to reach Arduino at ${ip}:`, err));
+        .catch(err => console.error(`[Lighting] Failed to reach ${ip}:`, err));
     }
   };
 
