@@ -7,9 +7,9 @@ export const DEFAULT_MODULES = [
   { id:'weather',   icon:'🌤️', label:'Weather Station',    active:true },
   { id:'health',    icon:'❤️', label:'Health Wearable',    active:true },
   { id:'energy',    icon:'⚡', label:'Energy Monitor',     active:true },
-  { id:'solar',     icon:'☀️', label:'Solar Panel Module', active:false },
-  { id:'security',  icon:'📷', label:'Security Camera',    active:false },
-  { id:'water',     icon:'💧', label:'Water Quality',      active:false },
+  { id:'indoor_climate', icon:'🌡️', label:'Temperature & Humidity Sensor', active:false },
+  { id:'indoor_light',   icon:'💡', label:'Light Sensor',                  active:false },
+  { id:'indoor_motion',  icon:'🏃', label:'Motion Sensor',                 active:false },
 ];
 
 export function SettingsProvider({ children }) {

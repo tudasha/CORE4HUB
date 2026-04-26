@@ -86,10 +86,10 @@ ${hasModule('weather') ? `1. Weather (Outside)
 • Temp: ${weatherRes?.temp ?? 'N/A'}°C | Condition: ${weatherRes?.condition ?? 'Unknown'} (${weatherRes?.desc ?? ''})
 • Humidity: ${weatherRes?.humidity ?? 'N/A'}% | Wind: ${weatherRes?.wind ?? '0'} m/s` : '1. Weather: NOT in user configuration — do NOT give weather advice.'}
 
-2. Smart Home Sensors (Inside / Arduino)
-• Indoor Temp: ${sd.temperature ?? 'N/A'}°C | Indoor Humidity: ${sd.humidity ?? 'N/A'}%
-• Motion Detected: ${sd.motionDetected ? 'YES' : 'NO'}
-• Indoor Light Level: ${sd.lightLevel ?? 'N/A'} lux
+${(hasModule('indoor_climate') || hasModule('indoor_motion') || hasModule('indoor_light')) ? `2. Smart Home Sensors (Inside / Arduino)
+${hasModule('indoor_climate') ? `• Indoor Temp: ${sd.temperature ?? 'N/A'}°C | Indoor Humidity: ${sd.humidity ?? 'N/A'}%` : ''}
+${hasModule('indoor_motion') ? `• Motion Detected: ${sd.motionDetected ? 'YES' : 'NO'}` : ''}
+${hasModule('indoor_light') ? `• Indoor Light Level: ${sd.lightLevel ?? 'N/A'} lux` : ''}` : '2. Smart Home Sensors: NOT in user configuration — do NOT give advice about indoor climate, light or motion.'}
 
 ${hasModule('energy') ? `3. Energy & Grid
 • Current Energy Price: ${sd.energyPrice ?? '130.0'} EUR/MWh

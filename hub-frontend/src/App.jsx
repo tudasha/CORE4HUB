@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import AIAssistant from './pages/AIAssistant';
 import Health from './pages/Health';
 import Weather from './pages/Weather';
+import Indoors from './pages/Indoors';
 import CalendarPage from './pages/CalendarPage';
 import Energy from './pages/Energy';
 import Community from './pages/Community';
@@ -35,9 +36,12 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
-function ModuleRoute({ moduleId, children }) {
+function ModuleRoute({ moduleId, moduleIds, children }) {
   const { modules } = useSettings();
-  const active = modules.find(m => m.id === moduleId)?.active;
+  
+  const idsToCheck = moduleIds || (moduleId ? [moduleId] : []);
+  const active = idsToCheck.some(id => modules.find(m => m.id === id)?.active);
+  
   if (!active) return (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'60vh', gap:16, color:'var(--text-muted)' }}>
       <Lock size={48} style={{ opacity:0.3 }} />
@@ -66,6 +70,7 @@ function MainLayout() {
       <main className={`main-content ${collapsed ? 'expanded' : ''}`}>
         <Routes>
           <Route path="/"          element={<Dashboard sensorData={sensorData} alerts={alerts} dismissAlert={dismissAlert} connected={connected} />} />
+          <Route path="/indoors"   element={<ModuleRoute moduleIds={['indoor_climate', 'indoor_light', 'indoor_motion']}><Indoors sensorData={sensorData} /></ModuleRoute>} />
           <Route path="/assistant" element={<AIAssistant sensorData={sensorData} />} />
           <Route path="/health"    element={<ModuleRoute moduleId="health"><Health sensorData={sensorData} /></ModuleRoute>} />
           <Route path="/weather"   element={<ModuleRoute moduleId="weather"><Weather /></ModuleRoute>} />

@@ -3,14 +3,15 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Bot, Heart, CloudSun, Calendar,
   Zap, Users, Settings, ChevronLeft, ChevronRight,
-  Wifi, WifiOff, LogOut, Lock
+  Wifi, WifiOff, LogOut, Lock, Home
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 
-// moduleId: null = always visible | string = requires that module to be active
+// moduleId: null = always visible | string = requires that module to be active | array = requires ANY of the modules
 const NAV_ITEMS = [
   { to: '/',          icon: LayoutDashboard, label: 'Dashboard',   id: 'nav-dashboard', moduleId: null      },
+  { to: '/indoors',   icon: Home,            label: 'Indoors',     id: 'nav-indoors',   moduleIds: ['indoor_climate', 'indoor_light', 'indoor_motion'] },
   { to: '/assistant', icon: Bot,             label: 'AI Assistant',id: 'nav-assistant', moduleId: null      },
   { to: '/health',    icon: Heart,           label: 'Health',      id: 'nav-health',    moduleId: 'health'  },
   { to: '/weather',   icon: CloudSun,        label: 'Weather',     id: 'nav-weather',   moduleId: 'weather' },
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
 
 const PAGE_COLORS = {
   '/':          'var(--accent-primary)',
+  '/indoors':   'var(--accent-teal)',
   '/assistant': 'var(--accent-secondary)',
   '/health':    'var(--accent-rose)',
   '/weather':   'var(--accent-teal)',
@@ -64,8 +66,10 @@ export default function Sidebar({ connected }) {
       </div>
 
       <nav style={{ flex:1, padding:'8px 12px', display:'flex', flexDirection:'column', gap:4, overflowY:'auto' }}>
-        {NAV_ITEMS.map(({ to, icon: Icon, label, id, moduleId }) => {
-          const locked = moduleId !== null && !activeModuleIds.has(moduleId);
+        {NAV_ITEMS.map(({ to, icon: Icon, label, id, moduleId, moduleIds }) => {
+          const idsToCheck = moduleIds || (moduleId ? [moduleId] : []);
+          const locked = idsToCheck.length > 0 && !idsToCheck.some(mId => activeModuleIds.has(mId));
+          
           if (locked) return (
             <div
               key={to}

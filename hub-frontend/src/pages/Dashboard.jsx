@@ -116,7 +116,7 @@ ${hasModule('weather') ? `- Outdoor Weather: ${weatherRes?.temp ?? '?'}°C, ${we
 - Wind: ${weatherRes?.wind ?? '?'} m/s` : ''}
 ${hasModule('energy') ? `- Energy Price: ${sensorData?.energyPrice ?? 130} EUR/MWh
 - Devices ON: ${devices.filter(d => d.on).map(d => d.name).join(', ') || 'None'}` : ''}
-- Indoor Temp: ${sensorData?.temperature ?? '?'}°C
+${hasModule('indoor_climate') ? `- Indoor Temp: ${sensorData?.temperature ?? '?'}°C` : ''}
 ${hasModule('weather') ? `\nWeather Forecast (next 3 days):\n${forecastStr}` : ''}
 
 Today's Schedule:
@@ -196,7 +196,7 @@ NO markdown, ONLY JSON array.`;
     ...alerts.filter(a => {
       // Filter out alerts for modules the user doesn't have
       if (a.message?.includes('Electric spike') && !modules.find(m => m.id === 'energy')?.active) return false;
-      if (a.message?.includes('Motion detected') && !modules.find(m => m.id === 'security')?.active) return false;
+      if (a.message?.includes('Motion detected') && !modules.find(m => m.id === 'indoor_motion')?.active) return false;
       return true;
     }).slice(0, 3),
   ];
@@ -245,6 +245,13 @@ NO markdown, ONLY JSON array.`;
 
         {modules.find(m => m.id === 'energy')?.active && (
           <StatCard icon={Zap}          label="Electric Flow" value={sd.electricFlow ?? '--'} unit="A" color="#eab308"               />
+        )}
+
+        {modules.find(m => m.id === 'indoor_climate')?.active && (
+          <>
+            <StatCard icon={Thermometer}  label="Indoor Temp"  value={sd.temperature ?? '--'} unit="°C" color="var(--accent-amber)" />
+            <StatCard icon={Droplets}     label="Indoor Hum"   value={sd.humidity ?? '--'}    unit="%"  color="var(--accent-teal)" />
+          </>
         )}
       </div>
 
