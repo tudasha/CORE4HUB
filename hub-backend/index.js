@@ -204,16 +204,8 @@ setInterval(fetchLiveEnergyPrice, 15 * 60 * 1000);
 
 function generateMockSensors() {
   return {
-    temperature: (18 + Math.random() * 12).toFixed(1),
-    humidity: (40 + Math.random() * 40).toFixed(1),
-    airQuality: Math.floor(30 + Math.random() * 70),
     electricFlow: (1.2 + Math.random() * 3.8).toFixed(2),
     energyPrice: currentEnergyPrice, // LIVE energy price (EUR/MWh)
-    heartRate: Math.floor(80 + Math.random() * 20),
-    oxygenLevel: (96 + Math.random() * 3).toFixed(1),
-    steps: Math.floor(Math.random() * 12000),
-    uvIndex: (Math.random() * 10).toFixed(1),
-    waterQuality: Math.floor(70 + Math.random() * 30),
     solarOutput: (Math.random() * 5).toFixed(2),
   };
 }

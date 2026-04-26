@@ -25,6 +25,7 @@ export function useWebSocket() {
           if (msg.type === 'SENSOR_UPDATE') {
             // Merge only non-indoor fields so real Arduino data is never overwritten
             setSensorData(prev => ({
+              ...prev,
               ...msg.data,
               // Preserve real Arduino indoor readings if we already have them
               ...(prev?.source === 'arduino' && {

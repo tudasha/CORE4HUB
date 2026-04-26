@@ -60,7 +60,6 @@ export default function Indoors({ sensorData }) {
               <>
                 <StatCard icon={Thermometer} label="Temperature"    value={sd.temperature} unit="°C"  color="var(--accent-amber)" />
                 <StatCard icon={Droplets}    label="Humidity"       value={sd.humidity}    unit="%"   color="var(--accent-teal)" />
-                <StatCard icon={Gauge}       label="Pressure"       value={sd.pressure}    unit="hPa" color="var(--accent-primary)" />
               </>
             )}
             {hasLight && (
