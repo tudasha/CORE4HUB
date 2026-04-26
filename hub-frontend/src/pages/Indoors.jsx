@@ -52,19 +52,13 @@ export default function Indoors({ sensorData }) {
       )}
 
       {/* Temp + Pressure + Light Intensity — all 3 come from the same Arduino */}
-      {(hasClimate || hasLight) && (
+      {hasClimate && (
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: '1.2rem', marginBottom: 16, color: 'var(--text-primary)' }}>Climate & Atmosphere</h2>
           <div className="dashboard-grid">
-            {hasClimate && (
-              <>
-                <StatCard icon={Thermometer} label="Temperature"    value={sd.temperature} unit="°C"  color="var(--accent-amber)" />
-                <StatCard icon={Gauge}       label="Pressure"       value={sd.pressure}    unit="hPa" color="var(--accent-primary)" />
-              </>
-            )}
-            {hasLight && (
-              <StatCard icon={Lightbulb} label="Light Intensity" value={sd.lightLevel} unit="lux" color="#eab308" />
-            )}
+            <StatCard icon={Thermometer} label="Temperature"    value={sd.temperature} unit="°C"  color="var(--accent-amber)" />
+            <StatCard icon={Gauge}       label="Pressure"       value={sd.pressure}    unit="hPa" color="var(--accent-primary)" />
+            <StatCard icon={Lightbulb}   label="Light Intensity" value={sd.lightLevel} unit="lux" color="#eab308" />
           </div>
         </div>
       )}

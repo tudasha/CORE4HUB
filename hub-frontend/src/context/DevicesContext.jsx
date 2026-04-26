@@ -31,8 +31,9 @@ export function DevicesProvider({ children }) {
 
     // Trigger physical LEDs on the Arduino sender via its local IP
     if (name === 'Lighting') {
-      // Use hardcoded test IP — swappable with arduinoIpRef.current when device_ip is sent in POST body
-      const ip = '10.224.220.44';
+      // Use the IP received from the Arduino's POST payload (set via setArduinoIp).
+      // Falls back to the known static IP if the device hasn't connected yet.
+      const ip = arduinoIpRef.current || '10.224.220.44';
       const url = targetState
         ? `http://${ip}/?c=FF0042&b=250`
         : `http://${ip}/?c=000000&b=0`;
