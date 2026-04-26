@@ -31,18 +31,15 @@ export function DevicesProvider({ children }) {
 
     // Trigger physical LEDs on the Arduino sender via its local IP
     if (name === 'Lighting') {
-      const ip = arduinoIpRef.current;
-      if (!ip) {
-        console.warn('Arduino IP not known yet — no LED command sent.');
-        return;
-      }
+      // Use hardcoded test IP — swappable with arduinoIpRef.current when device_ip is sent in POST body
+      const ip = '10.224.220.44';
       const url = targetState
         ? `http://${ip}/?c=FF0042&b=250`
         : `http://${ip}/?c=000000&b=0`;
 
-      console.log(`[Lighting] Sending LED command to Arduino at ${ip}:`, url);
+      console.log(`[Lighting] Sending LED command to ${ip}:`, url);
       fetch(url, { mode: 'no-cors' })
-        .catch(err => console.error(`Failed to communicate with Arduino at ${ip}:`, err));
+        .catch(err => console.error(`Failed to reach Arduino at ${ip}:`, err));
     }
   };
 
