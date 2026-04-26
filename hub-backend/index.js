@@ -582,14 +582,7 @@ app.get('/api/food/barcode/:barcode', async (req, res) => {
     res.status(500).json({ error: 'Failed to look up barcode' });
   }
 });
-      'DELETE FROM health_meals WHERE id = $1 AND user_id = $2',
-      [req.params.id, req.user.id]
-    );
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+
 
 // ── FatSecret Food Search Proxy (OAuth 1.0a) ─────────────────
 
