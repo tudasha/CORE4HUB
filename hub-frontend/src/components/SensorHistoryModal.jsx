@@ -20,7 +20,7 @@ function LineChart({ data, field, label, color, unit }) {
     );
   }
 
-  const vals = validPts.map(p => p[field]);
+  const vals = validPts.map(p => Number(p[field]));
   const minV = Math.min(...vals);
   const maxV = Math.max(...vals);
   const range = maxV - minV || 1;
@@ -30,9 +30,10 @@ function LineChart({ data, field, label, color, unit }) {
 
   // Map each valid point to x,y in SVG space
   const coords = validPts.map((p, i) => {
+    const v = Number(p[field]);
     const x = PL + (i / (validPts.length - 1)) * innerW;
-    const y = PT + (1 - (p[field] - minV) / range) * innerH;
-    return { x, y, val: p[field], ts: p.ts };
+    const y = PT + (1 - (v - minV) / range) * innerH;
+    return { x, y, val: v, ts: p.ts };
   });
 
   const linePoints = coords.map(c => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
