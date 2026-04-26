@@ -54,6 +54,13 @@ export function useWebSocket() {
               source: 'arduino',
             }));
           }
+          if (msg.type === 'HEALTH_UPDATE' && msg.kind === 'steps') {
+            setSensorData(prev => ({
+              ...prev,
+              steps: msg.data.steps,
+              source: prev?.source || 'ws'
+            }));
+          }
           if (msg.type === 'ALERT') {
             setAlerts(prev => [{ ...msg, id: Date.now() }, ...prev].slice(0, 20));
           }

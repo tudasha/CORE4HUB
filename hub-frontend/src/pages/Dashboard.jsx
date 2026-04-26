@@ -80,7 +80,7 @@ export default function Dashboard({ sensorData, alerts = [], dismissAlert, conne
     return () => clearInterval(t2);
   }, []);
 
-  // Fetch today's step count from Core4Health DB with 3-second polling
+  // Fetch initial steps, but let WebSocket take over for live updates
   useEffect(() => {
     const fetchSteps = async () => {
       const token = localStorage.getItem('token');
@@ -99,9 +99,14 @@ export default function Dashboard({ sensorData, alerts = [], dismissAlert, conne
     };
     
     fetchSteps(); // initial fetch
-    const t = setInterval(fetchSteps, 3000);
-    return () => clearInterval(t);
   }, []);
+
+  // Update realSteps instantly from WebSocket if available
+  useEffect(() => {
+    if (sensorData?.steps !== undefined) {
+      setRealSteps(parseInt(sensorData.steps));
+    }
+  }, [sensorData?.steps]);
 
   const fetchLiveSuggestions = async () => {
     setLoadingSuggestions(true);
