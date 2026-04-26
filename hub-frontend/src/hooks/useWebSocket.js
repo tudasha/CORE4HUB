@@ -22,9 +22,25 @@ export function useWebSocket() {
       ws.current.onmessage = (e) => {
         try {
           const msg = JSON.parse(e.data);
-          if (msg.type === 'SENSOR_UPDATE') setSensorData(msg.data);
+          if (msg.type === 'SENSOR_UPDATE') {
+            // Merge only non-indoor fields so real Arduino data is never overwritten
+            setSensorData(prev => ({
+              ...msg.data,
+              // Preserve real Arduino indoor readings if we already have them
+              ...(prev?.source === 'arduino' && {
+                temperature:   prev.temperature,
+                humidity:      prev.humidity,
+                pressure:      prev.pressure,
+                altitude:      prev.altitude,
+                lightLevel:    prev.lightLevel,
+                motionDetected: prev.motionDetected,
+                arduinoIp:     prev.arduinoIp,
+                source:        'arduino',
+              }),
+            }));
+          }
           if (msg.type === 'ARDUINO_UPDATE') {
-            // Real Arduino data overrides the mock sensor values
+            // Real Arduino data — merge on top and mark source
             setSensorData(prev => ({
               ...prev,
               ...(msg.data.temperature !== null && { temperature: msg.data.temperature }),
@@ -33,6 +49,7 @@ export function useWebSocket() {
               ...(msg.data.altitude    !== null && { altitude: msg.data.altitude }),
               ...(msg.data.lightLevel  !== null && { lightLevel: msg.data.lightLevel }),
               motionDetected: msg.data.motionDetected,
+              arduinoIp:      msg.data.arduinoIp ?? prev?.arduinoIp,
               source: 'arduino',
             }));
           }

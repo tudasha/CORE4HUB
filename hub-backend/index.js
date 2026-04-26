@@ -225,7 +225,7 @@ app.post('/api/arduino/data', async (req, res) => {
     return res.status(401).json({ error: 'Invalid device token' });
   }
 
-  const { temperature, pressure, altitude, light_level, humidity, motion_detected, device_id } = req.body;
+  const { temperature, pressure, altitude, light_level, humidity, motion_detected, device_id, device_ip } = req.body;
 
   try {
     // Persist to DB
@@ -245,8 +245,10 @@ app.post('/api/arduino/data', async (req, res) => {
       );
     }
 
-    // Capture sender IP (used by frontend to send LED commands back to this device)
-    const senderIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+    // Capture sender IP: prefer explicitly sent device_ip (works through production proxies),
+    // fall back to socket/header detection
+    const senderIp = device_ip
+      || req.headers['x-forwarded-for']?.split(',')[0]?.trim()
       || req.socket?.remoteAddress
       || req.ip;
 
