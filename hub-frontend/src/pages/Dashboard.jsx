@@ -155,8 +155,9 @@ ${todaySchedule}
 Rules (ONLY apply rules for active modules):
 ${hasModule('weather') ? '1. WEATHER vs SCHEDULE: If a scheduled activity is outdoors (walk, run, gym, cycling) AND rain > 50% or wind > 10 m/s, warn and suggest rescheduling.' : ''}
 ${hasModule('energy') ? '2. ENERGY: If Energy Price > 100 and high-wattage devices (HVAC, Washing Machine, EV Charger) are ON, suggest turning them off.' : ''}
-${hasModule('indoor_climate') && hasModule('weather') ? '3. COMFORT: If Indoor Temp > Outdoor Temp by more than 4°C and no rain, suggest opening a window instead of AC. If Indoor Humidity is > 60%, suggest turning on dehumidifier/AC.' : ''}
-${hasModule('health') ? '4. HEALTH: If Steps Today < 5000 and it is past 16:00, suggest a walk.' : ''}
+${hasModule('indoor_climate') && hasModule('weather') ? '3. COMFORT: If Indoor Temp > Outdoor Temp by more than 4°C and no rain, suggest opening a window instead of AC.' : ''}
+${hasModule('indoor_climate') ? '4. VENTILATION: If Indoor Humidity is > 40%, you MUST output an actionable suggestion to turn on the Ventilator. Action must exactly be: {"device": "Ventilator", "on": true}.' : ''}
+${hasModule('health') ? '5. HEALTH: If Steps Today < 5000 and it is past 16:00, suggest a walk.' : ''}
 
 Output format (ONLY valid JSON array, NO markdown):
 [

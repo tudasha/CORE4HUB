@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, Bot, BrainCircuit, Loader, AlertTriangle, RefreshCw, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -54,6 +56,8 @@ Example to turn off the AC:
 [TOGGLE_DEVICE: {"device": "HVAC", "on": false}]
 IMPORTANT: The device named "Lighting" is directly connected to the physical Arduino LED strip. Toggling it will PHYSICALLY turn the LEDs on or off. If the user says "turn off the light", "stinge becul", "lights off" or anything similar, use:
 [TOGGLE_DEVICE: {"device": "Lighting", "on": false}]
+IMPORTANT: The device named "Ventilator" controls a physical motor (fan). If the user asks to turn on the fan, ventilator, or reduce humidity, use:
+[TOGGLE_DEVICE: {"device": "Ventilator", "on": true}] (and false to turn off).
 Always explain WHY you are toggling it (e.g. "I turned off the AC because energy prices are high.").`;
 
 function buildContextMessage(sensorData, weatherRes, schedule, devices, modules) {
@@ -184,13 +188,50 @@ export default function AIAssistant({ sensorData }) {
     };
   }, [voiceAutoSend, language]); // Re-bind if lang or autoSend changes
 
-  const toggleListen = () => {
-    if (!recognitionRef.current) return alert('Speech Recognition not supported in this browser.');
-    if (isListening) {
-      recognitionRef.current.stop();
+  const toggleListen = async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { speechRecognition } = await SpeechRecognition.checkPermissions();
+        if (speechRecognition !== 'granted') {
+          const req = await SpeechRecognition.requestPermissions();
+          if (req.speechRecognition !== 'granted') {
+            return alert('Microphone permission is required for voice commands.');
+          }
+        }
+        
+        // Ensure listener is added only once
+        SpeechRecognition.removeAllListeners();
+        SpeechRecognition.addListener('partialResults', (data) => {
+          if (data.matches && data.matches.length > 0) {
+            setInput(data.matches[0]);
+            setIsListening(false);
+            if (voiceAutoSend) {
+              sendMessage(data.matches[0]);
+            }
+          }
+        });
+
+        setIsListening(true);
+        await SpeechRecognition.start({
+          language,
+          maxResults: 1,
+          prompt: 'Speak now...',
+          partialResults: false,
+          popup: true, // Shows native Android Google voice dialog (very robust)
+        });
+      } catch (e) {
+        console.error('Speech Recognition Error:', e);
+        setIsListening(false);
+      }
     } else {
-      recognitionRef.current.lang = language;
-      recognitionRef.current.start();
+      // Fallback for Web/Browser
+      if (!recognitionRef.current) return alert('Speech Recognition not supported in this browser.');
+      if (isListening) {
+        recognitionRef.current.stop();
+      } else {
+        recognitionRef.current.lang = language;
+        recognitionRef.current.start();
+      }
     }
   };
 

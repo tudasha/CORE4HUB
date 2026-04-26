@@ -54,7 +54,7 @@ function ModuleRoute({ moduleId, moduleIds, children }) {
 
 function MainLayout() {
   const { sensorData: wsSensorData, alerts, connected, dismissAlert } = useWebSocket();
-  const { setArduinoIp } = useDevices();
+  const { devices, toggleDevice, setArduinoIp } = useDevices();
   const [sensorData, setSensorData] = useState(null); // null = waiting for Arduino, persists after first update
   const [collapsed, setCollapsed] = useState(false);
 
@@ -66,6 +66,15 @@ function MainLayout() {
     }
     // No mock fallback — data persists from last Arduino transmission
   }, [wsSensorData]);
+
+  // Auto-shutoff Ventilator if humidity drops below 40%
+  useEffect(() => {
+    const fan = devices.find(d => d.name === 'Ventilator');
+    if (fan?.on && sensorData?.humidity !== undefined && sensorData.humidity < 40) {
+      console.log('Humidity < 40%. Auto-shutting off Ventilator.');
+      toggleDevice('Ventilator', false);
+    }
+  }, [sensorData?.humidity, devices, toggleDevice]);
 
   return (
     <>

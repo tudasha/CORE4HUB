@@ -5,6 +5,7 @@ import { CapacitorHttp } from '@capacitor/core';
 const DevicesContext = createContext();
 
 const INITIAL_DEVICES = [
+  { name: 'Ventilator', icon: '💨', watts: 50, on: false },
   { name: 'HVAC', icon: '❄️', watts: 1200, on: true },
   { name: 'Refrigerator', icon: '🧊', watts: 150, on: true },
   { name: 'Washing Machine', icon: '🫧', watts: 500, on: false },
@@ -44,6 +45,18 @@ export function DevicesProvider({ children }) {
         img.src = url;
       } catch (err) {
         console.error(`[Lighting] Failed to reach ${ip}:`, err);
+      }
+    }
+
+    if (name === 'Ventilator') {
+      const ip = '10.224.220.44';
+      const url = targetState ? `http://${ip}/MOTOR_ON` : `http://${ip}/MOTOR_OFF`;
+      console.log(`[Ventilator] → ${url}`);
+      try {
+        const img = new Image();
+        img.src = url;
+      } catch (err) {
+        console.error(`[Ventilator] Failed to reach ${ip}:`, err);
       }
     }
   };
