@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import {
   Thermometer, Droplets, Wind, Zap, Heart, Activity,
-  Footprints, Sun, CloudSun, AlertTriangle, CheckCircle, Info, X, Bell, BrainCircuit, Loader, RefreshCw
+  Footprints, Sun, CloudSun, AlertTriangle, CheckCircle, Info, X, Bell, BrainCircuit, Loader, RefreshCw, TrendingUp
 } from 'lucide-react';
 import { useWeather, useTransit } from '../hooks/useWeather';
 import { useAuth } from '../context/AuthContext';
 import { useSchedule } from '../context/ScheduleContext';
 import { useSettings } from '../context/SettingsContext';
 import { useDevices } from '../context/DevicesContext';
+import { useSensorHistory } from '../hooks/useSensorHistory';
+import SensorHistoryModal from '../components/SensorHistoryModal';
 function StatCard({ icon: Icon, label, value, unit, color, pulse }) {
   return (
     <div className="glass-card stat-card p-4 fade-in" style={{ '--accent-primary': color }}>
@@ -74,6 +76,8 @@ export default function Dashboard({ sensorData, alerts = [], dismissAlert, conne
   const [autoAppliedIds, setAutoAppliedIds] = useState([]);
   const [now, setNow] = useState(new Date());
   const [realSteps, setRealSteps] = useState(null); // from Core4Health DB
+  const [showChart, setShowChart] = useState(false);
+  const { history: sensorHistory } = useSensorHistory(sensorData);
 
   useEffect(() => {
     const t2 = setInterval(() => setNow(new Date()), 1000);
@@ -263,6 +267,19 @@ NO markdown, ONLY JSON array.`;
           <div style={{ fontFamily:'Space Grotesk', fontSize:'2rem', fontWeight:700, color:'var(--text-primary)', letterSpacing:'-0.04em' }}>
             {now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:false })}
           </div>
+          <button
+            onClick={() => setShowChart(true)}
+            title="Open Live Sensor Chart"
+            style={{
+              display:'flex', alignItems:'center', gap:6,
+              background:'rgba(99,102,241,0.12)', border:'1px solid rgba(99,102,241,0.25)',
+              borderRadius:10, padding:'8px 14px', cursor:'pointer',
+              color:'var(--accent-primary)', fontSize:'0.8rem', fontWeight:600,
+              transition:'all 0.2s ease',
+            }}
+          >
+            <TrendingUp size={15}/> Live Chart
+          </button>
           <Bell size={20} color="var(--text-muted)"/>
         </div>
       </div>
@@ -420,6 +437,10 @@ NO markdown, ONLY JSON array.`;
           </div>
         </div>
       </div>
+
+      {showChart && (
+        <SensorHistoryModal history={sensorHistory} onClose={() => setShowChart(false)} />
+      )}
     </div>
   );
 }
