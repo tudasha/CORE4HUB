@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
@@ -67,13 +67,22 @@ function MainLayout() {
     // No mock fallback — data persists from last Arduino transmission
   }, [wsSensorData]);
 
-  // Auto-shutoff Ventilator if humidity drops below 40%
+  // Auto-shutoff Ventilator only when humidity *drops* below 40%
+  const prevHumRef = useRef(null);
   useEffect(() => {
+    const currentHum = sensorData?.humidity;
+    if (currentHum === undefined || currentHum === null) return;
+
+    const prevHum = prevHumRef.current;
     const fan = devices.find(d => d.name === 'Ventilator');
-    if (fan?.on && sensorData?.humidity !== undefined && sensorData.humidity < 40) {
-      console.log('Humidity < 40%. Auto-shutting off Ventilator.');
+
+    // If fan is ON, and humidity WAS >= 40, and NOW is < 40 -> Turn Off
+    if (fan?.on && prevHum >= 40 && currentHum < 40) {
+      console.log('Humidity dropped below 40%. Auto-shutting off Ventilator.');
       toggleDevice('Ventilator', false);
     }
+
+    prevHumRef.current = currentHum;
   }, [sensorData?.humidity, devices, toggleDevice]);
 
   return (
