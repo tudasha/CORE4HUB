@@ -15,9 +15,28 @@ export function DevicesProvider({ children }) {
   const [devices, setDevices] = useState(INITIAL_DEVICES);
 
   const toggleDevice = (name, state) => {
-    setDevices(prev => prev.map(d => 
-      d.name === name ? { ...d, on: state !== undefined ? state : !d.on } : d
-    ));
+    let targetState = state;
+
+    setDevices(prev => prev.map(d => {
+      if (d.name === name) {
+        targetState = state !== undefined ? state : !d.on;
+        return { ...d, on: targetState };
+      }
+      return d;
+    }));
+
+    // Trigger physical LEDs locally
+    if (name === 'Lighting') {
+      // We expect the browser to fire a local HTTP GET to the Arduino.
+      // Mode 'no-cors' prevents the browser from blocking the request due to CORS policies,
+      // since we only care about sending the command, not reading the response.
+      const url = targetState 
+        ? 'http://192.168.1.50/?c=FF0042&b=250' 
+        : 'http://192.168.1.50/?c=000000&b=0';
+
+      fetch(url, { mode: 'no-cors' })
+        .catch(err => console.error('Failed to communicate with Arduino at 192.168.1.50:', err));
+    }
   };
 
   return (
