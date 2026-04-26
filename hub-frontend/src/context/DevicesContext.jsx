@@ -35,8 +35,8 @@ export function DevicesProvider({ children }) {
       const ip = '10.224.220.44';
       // Format: http://<ip>/?c=<hex_color>&b=<brightness>
       const url = targetState
-        ? `http://${ip}/?c=FF0042&b=250`
-        : `http://${ip}/?c=000000&b=0`;
+        ? `http://${ip}/?c=FF0042&b=250&t=${Date.now()}`
+        : `http://${ip}/?c=000000&b=0&t=${Date.now()}`;
 
       console.log(`[Lighting] → ${url}`);
       try {
@@ -50,7 +50,9 @@ export function DevicesProvider({ children }) {
 
     if (name === 'Ventilator') {
       const ip = '10.224.220.44';
-      const url = targetState ? `http://${ip}/MOTOR_ON` : `http://${ip}/MOTOR_OFF`;
+      const url = targetState 
+        ? `http://${ip}/MOTOR_ON?t=${Date.now()}` 
+        : `http://${ip}/MOTOR_OFF?t=${Date.now()}`;
       console.log(`[Ventilator] → ${url}`);
       try {
         const img = new Image();

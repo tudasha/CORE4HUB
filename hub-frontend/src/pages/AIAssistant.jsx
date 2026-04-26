@@ -198,27 +198,24 @@ export default function AIAssistant({ sensorData }) {
             return alert('Microphone permission is required for voice commands.');
           }
         }
-        
-        // Ensure listener is added only once
-        SpeechRecognition.removeAllListeners();
-        SpeechRecognition.addListener('partialResults', (data) => {
-          if (data.matches && data.matches.length > 0) {
-            setInput(data.matches[0]);
-            setIsListening(false);
-            if (voiceAutoSend) {
-              sendMessage(data.matches[0]);
-            }
-          }
-        });
 
         setIsListening(true);
-        await SpeechRecognition.start({
+        const result = await SpeechRecognition.start({
           language,
           maxResults: 1,
           prompt: 'Speak now...',
           partialResults: false,
           popup: true, // Shows native Android Google voice dialog (very robust)
         });
+
+        setIsListening(false);
+        if (result.matches && result.matches.length > 0) {
+          const text = result.matches[0];
+          setInput(text);
+          if (voiceAutoSend) {
+            sendMessage(text);
+          }
+        }
       } catch (e) {
         console.error('Speech Recognition Error:', e);
         setIsListening(false);
