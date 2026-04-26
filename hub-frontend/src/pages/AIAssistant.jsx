@@ -52,6 +52,8 @@ Use this format EXACTLY to toggle a device:
 [TOGGLE_DEVICE: {"device": "Device Name", "on": true}]
 Example to turn off the AC:
 [TOGGLE_DEVICE: {"device": "HVAC", "on": false}]
+IMPORTANT: The device named "Lighting" is directly connected to the physical Arduino LED strip. Toggling it will PHYSICALLY turn the LEDs on or off. If the user says "turn off the light", "stinge becul", "lights off" or anything similar, use:
+[TOGGLE_DEVICE: {"device": "Lighting", "on": false}]
 Always explain WHY you are toggling it (e.g. "I turned off the AC because energy prices are high.").`;
 
 function buildContextMessage(sensorData, weatherRes, schedule, devices, modules) {
