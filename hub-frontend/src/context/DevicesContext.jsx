@@ -29,7 +29,7 @@ export function DevicesProvider({ children }) {
 
     // Send LED command to Arduino when Lighting is toggled
     if (name === 'Lighting') {
-      const ip = arduinoIpRef.current || '10.224.220.44';
+      const ip = '10.224.220.44';
       // Format: http://<ip>/?c=<hex_color>&b=<brightness>
       const url = targetState
         ? `http://${ip}/?c=FF0042&b=250`
