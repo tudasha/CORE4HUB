@@ -521,7 +521,8 @@ Format exactly like this:
         }
 
         const modelText = response.data.candidates[0].content.parts[0].text;
-        const parsed = JSON.parse(modelText);
+        const cleanText = modelText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanText);
         return res.json({ success: true, estimation: parsed });
       } catch (err) {
         const status = err.response?.status;
