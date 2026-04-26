@@ -447,7 +447,141 @@ app.get('/api/health/meals', authenticateToken, async (req, res) => {
 
 app.delete('/api/health/meals/:id', authenticateToken, async (req, res) => {
   try {
-    await pool.query(
+    await pool.query('DELETE FROM health_meals WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Core4Health: AI Food Estimation (Text & Image) ────────────
+
+app.post('/api/food/ai-estimate', async (req, res) => {
+  const { text, imageBase64 } = req.body;
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return res.status(500).json({ error: 'Missing GEMINI_API_KEY in backend .env' });
+
+  if (!text && !imageBase64) {
+    return res.status(400).json({ error: 'Provide either text or imageBase64' });
+  }
+
+  try {
+    const parts = [];
+    if (text) {
+      parts.push({ text: `Analyze this food: "${text}". Estimate the macros per reasonable serving.` });
+    }
+    if (imageBase64) {
+      // imageBase64 comes as 'data:image/jpeg;base64,...'
+      const base64Data = imageBase64.split(',')[1] || imageBase64;
+      const mimeType = imageBase64.split(';')[0].split(':')[1] || 'image/jpeg';
+      parts.push({
+        inlineData: { mimeType, data: base64Data }
+      });
+      if (!text) {
+        parts.push({ text: 'Analyze this image of food and estimate the macros for the whole meal shown.' });
+      }
+    }
+
+    const sysInstruct = `You are a nutrition expert API. Respond ONLY with a valid, clean JSON object. Do not wrap it in markdown. Do not include any explanations.
+Format exactly like this:
+{
+  "name": "A concise, capitalized name for the food (max 4 words)",
+  "calories": 250,
+  "protein": 15,
+  "carbs": 30,
+  "fat": 10
+}`;
+
+    const payload = {
+      systemInstruction: { parts: [{ text: sysInstruct }] },
+      contents: [{ role: 'user', parts }],
+      generationConfig: { temperature: 0.3, responseMimeType: "application/json" }
+    };
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+    const response = await axios.post(url, payload, { headers: { 'Content-Type': 'application/json' } });
+    
+    if (response.data?.error) {
+      return res.status(500).json({ error: response.data.error.message });
+    }
+
+    const modelText = response.data.candidates[0].content.parts[0].text;
+    const parsed = JSON.parse(modelText);
+    res.json({ success: true, estimation: parsed });
+  } catch (err) {
+    console.error('[Gemini AI Estimate Error]', err?.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to estimate macros with AI. Please try again.' });
+  }
+});
+
+// ── Core4Health: Barcode Scanner Proxy ────────────────────────
+
+app.get('/api/food/barcode/:barcode', async (req, res) => {
+  const { barcode } = req.params;
+  const consumerKey = process.env.FATSECRET_CONSUMER_KEY;
+  const consumerSecret = process.env.FATSECRET_CONSUMER_SECRET;
+  if (!consumerKey || !consumerSecret) {
+    return res.status(500).json({ error: 'Missing FatSecret API credentials on server' });
+  }
+
+  try {
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const nonce = crypto.randomBytes(16).toString('hex');
+
+    const params = {
+      oauth_consumer_key: consumerKey,
+      oauth_signature_method: 'HMAC-SHA1',
+      oauth_timestamp: timestamp,
+      oauth_nonce: nonce,
+      oauth_version: '1.0',
+      method: 'food.find_id_for_barcode',
+      barcode: barcode,
+      format: 'json',
+    };
+
+    const sortedParams = Object.keys(params).sort().map(k => `${k}=${encodeURIComponent(params[k])}`).join('&');
+    const signatureBaseString = `POST&${encodeURIComponent('https://platform.fatsecret.com/rest/server.api')}&${encodeURIComponent(sortedParams)}`;
+    const signingKey = `${encodeURIComponent(consumerSecret)}&`;
+    const signature = crypto.createHmac('sha1', signingKey).update(signatureBaseString).digest('base64');
+    
+    params.oauth_signature = signature;
+    const searchParams = new URLSearchParams(params);
+
+    // 1. Get Food ID from barcode
+    const findRes = await axios.post('https://platform.fatsecret.com/rest/server.api', searchParams.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+
+    const foodId = findRes.data?.food_id?.value;
+    if (!foodId) return res.status(404).json({ error: 'Product not found for this barcode' });
+
+    // 2. Fetch full food details by ID
+    // We can just redirect them to the existing GET /api/food/:id proxy, but it's simpler to fetch it here
+    const params2 = {
+      oauth_consumer_key: consumerKey,
+      oauth_signature_method: 'HMAC-SHA1',
+      oauth_timestamp: timestamp,
+      oauth_nonce: crypto.randomBytes(16).toString('hex'),
+      oauth_version: '1.0',
+      method: 'food.get.v4',
+      food_id: foodId,
+      format: 'json',
+    };
+
+    const sorted2 = Object.keys(params2).sort().map(k => `${k}=${encodeURIComponent(params2[k])}`).join('&');
+    const sigBase2 = `POST&${encodeURIComponent('https://platform.fatsecret.com/rest/server.api')}&${encodeURIComponent(sorted2)}`;
+    const sig2 = crypto.createHmac('sha1', signingKey).update(sigBase2).digest('base64');
+    params2.oauth_signature = sig2;
+
+    const detailRes = await axios.post('https://platform.fatsecret.com/rest/server.api', new URLSearchParams(params2).toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+
+    res.json(detailRes.data);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to look up barcode' });
+  }
+});
       'DELETE FROM health_meals WHERE id = $1 AND user_id = $2',
       [req.params.id, req.user.id]
     );
