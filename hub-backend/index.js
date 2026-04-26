@@ -17,11 +17,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(cors({
-  origin: function(origin, callback) {
-    // Allow all origins (including Capacitor's empty origin or localhost)
-    return callback(null, true);
-  },
-  credentials: true,
+  origin: '*'
 }));
 app.use(express.json());
 
